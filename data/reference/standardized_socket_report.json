@@ -1,0 +1,424 @@
+{
+  "passed": true,
+  "clinical_use": false,
+  "disclaimer": "A passing result is a CAD check of a synthetic solid. It is not a clearance to manufacture or wear a socket.",
+  "socket_model_id": "synthetic-transtibial-socket-standard",
+  "reference_limb_model_id": "synthetic-transtibial-standard",
+  "error": null,
+  "categories": {
+    "cad_validity": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "valid_solid",
+          "passed": true,
+          "detail": "BRepCheck_Analyzer"
+        },
+        {
+          "name": "one_solid",
+          "passed": true,
+          "detail": "1 solids"
+        },
+        {
+          "name": "positive_volume",
+          "passed": true,
+          "detail": "227419.862 mm3"
+        },
+        {
+          "name": "step_reimport",
+          "passed": true,
+          "detail": "reimported volume 227419.862 mm3"
+        },
+        {
+          "name": "stl_mesh",
+          "passed": true,
+          "detail": "1800400 triangles"
+        }
+      ]
+    },
+    "dimensions": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "socket_depth",
+          "passed": true,
+          "detail": "measured 152.0000 mm, target 152.0000 mm"
+        },
+        {
+          "name": "rim_crest",
+          "passed": true,
+          "detail": "measured -2.5000 mm, target -2.5000 mm"
+        },
+        {
+          "name": "inner_ml_diameter_mm",
+          "passed": true,
+          "detail": "measured 123.06617633494804 mm, target 123.0662 mm"
+        },
+        {
+          "name": "inner_ap_diameter_mm",
+          "passed": true,
+          "detail": "measured 104.60624991472338 mm, target 104.6062 mm"
+        },
+        {
+          "name": "distal_axial_wall",
+          "passed": true,
+          "detail": "measured 7.999999821186236 mm, target 8.0000 mm"
+        },
+        {
+          "name": "proximal_inner_perimeter_mm",
+          "passed": true,
+          "detail": "measured 358.2150247677713 mm, constructed 358.2150 mm"
+        },
+        {
+          "name": "proximal_outer_perimeter_mm",
+          "passed": true,
+          "detail": "measured 387.3225371662251 mm, constructed 387.3225 mm"
+        },
+        {
+          "name": "proximal_ml_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 4.999999999999972 mm, constructed 5.0000 mm"
+        },
+        {
+          "name": "proximal_ap_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 4.250000000002402 mm, constructed 4.2500 mm"
+        },
+        {
+          "name": "proximal_inner_area",
+          "passed": true,
+          "detail": "measured 10067.150609295983 mm2, ellipse 10110.82 mm2"
+        },
+        {
+          "name": "q25_inner_perimeter_mm",
+          "passed": true,
+          "detail": "measured 301.64249811562917 mm, constructed 301.6430 mm"
+        },
+        {
+          "name": "q25_outer_perimeter_mm",
+          "passed": true,
+          "detail": "measured 330.74996160810906 mm, constructed 330.7505 mm"
+        },
+        {
+          "name": "q25_ml_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 5.0 mm, constructed 5.0000 mm"
+        },
+        {
+          "name": "q25_ap_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 4.249999974522851 mm, constructed 4.2500 mm"
+        },
+        {
+          "name": "q25_inner_area",
+          "passed": true,
+          "detail": "measured 7177.20160546193 mm2, ellipse 7169.44 mm2"
+        },
+        {
+          "name": "q50_inner_perimeter_mm",
+          "passed": true,
+          "detail": "measured 286.6425233198637 mm, constructed 286.6430 mm"
+        },
+        {
+          "name": "q50_outer_perimeter_mm",
+          "passed": true,
+          "detail": "measured 315.7499868123351 mm, constructed 315.7505 mm"
+        },
+        {
+          "name": "q50_ml_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 4.999999999995829 mm, constructed 5.0000 mm"
+        },
+        {
+          "name": "q50_ap_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 4.249999974523888 mm, constructed 4.2500 mm"
+        },
+        {
+          "name": "q50_inner_area",
+          "passed": true,
+          "detail": "measured 6481.138831336224 mm2, ellipse 6474.13 mm2"
+        },
+        {
+          "name": "q75_inner_perimeter_mm",
+          "passed": true,
+          "detail": "measured 266.64255692547334 mm, constructed 266.6430 mm"
+        },
+        {
+          "name": "q75_outer_perimeter_mm",
+          "passed": true,
+          "detail": "measured 295.75002041793977 mm, constructed 295.7505 mm"
+        },
+        {
+          "name": "q75_ml_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 4.999999999995154 mm, constructed 5.0000 mm"
+        },
+        {
+          "name": "q75_ap_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 4.2499999745189285 mm, constructed 4.2500 mm"
+        },
+        {
+          "name": "q75_inner_area",
+          "passed": true,
+          "detail": "measured 5608.271352011862 mm2, ellipse 5602.21 mm2"
+        },
+        {
+          "name": "distal_reference_inner_perimeter_mm",
+          "passed": true,
+          "detail": "measured 246.64300493659283 mm, constructed 246.6430 mm"
+        },
+        {
+          "name": "distal_reference_outer_perimeter_mm",
+          "passed": true,
+          "detail": "measured 275.7505173350323 mm, constructed 275.7505 mm"
+        },
+        {
+          "name": "distal_reference_ml_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 5.000000000000007 mm, constructed 5.0000 mm"
+        },
+        {
+          "name": "distal_reference_ap_wall_thickness_mm",
+          "passed": true,
+          "detail": "measured 4.249999999997719 mm, constructed 4.2500 mm"
+        },
+        {
+          "name": "distal_reference_inner_area",
+          "passed": true,
+          "detail": "measured 4772.616917302196 mm2, ellipse 4793.32 mm2"
+        }
+      ]
+    },
+    "structure": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "proximal_opening_open",
+          "passed": true,
+          "detail": "A ray from the cavity toward -Z does not hit a lid"
+        },
+        {
+          "name": "distal_end_closed",
+          "passed": true,
+          "detail": "A ray from the cavity toward +Z hits the distal wall"
+        },
+        {
+          "name": "distal_plug_single_contour",
+          "passed": true,
+          "detail": "1 curves, status outer_only"
+        },
+        {
+          "name": "no_contour_beyond_tip",
+          "passed": true,
+          "detail": "0 curves past the outer tip"
+        },
+        {
+          "name": "proximal_inner_inside_outer",
+          "passed": true,
+          "detail": "inner 358.215 mm, outer 387.323 mm"
+        },
+        {
+          "name": "q25_two_contours",
+          "passed": true,
+          "detail": "status measured, curves 2"
+        },
+        {
+          "name": "q25_inner_inside_outer",
+          "passed": true,
+          "detail": "inner 301.642 mm, outer 330.750 mm"
+        },
+        {
+          "name": "q50_two_contours",
+          "passed": true,
+          "detail": "status measured, curves 2"
+        },
+        {
+          "name": "q50_inner_inside_outer",
+          "passed": true,
+          "detail": "inner 286.643 mm, outer 315.750 mm"
+        },
+        {
+          "name": "q75_two_contours",
+          "passed": true,
+          "detail": "status measured, curves 2"
+        },
+        {
+          "name": "q75_inner_inside_outer",
+          "passed": true,
+          "detail": "inner 266.643 mm, outer 295.750 mm"
+        },
+        {
+          "name": "distal_reference_inner_inside_outer",
+          "passed": true,
+          "detail": "inner 246.643 mm, outer 275.751 mm"
+        },
+        {
+          "name": "minimum_wall_thickness",
+          "passed": true,
+          "detail": "thinnest sample 4.2499999745189285 mm, demo floor 1.5 mm"
+        }
+      ]
+    },
+    "reference_integrity": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "limb_model_id",
+          "passed": true,
+          "detail": "synthetic-transtibial-standard vs synthetic-transtibial-standard"
+        },
+        {
+          "name": "limb_model_version",
+          "passed": true,
+          "detail": "1.0.0 vs 1.0.0"
+        },
+        {
+          "name": "units",
+          "passed": true,
+          "detail": "Both profiles must use millimetres"
+        },
+        {
+          "name": "clinical_use_false",
+          "passed": true,
+          "detail": "clinical_use must stay false"
+        },
+        {
+          "name": "coordinate_frame",
+          "passed": true,
+          "detail": "X is ML, Y is AP, distal is +Z, opening at z = 0"
+        },
+        {
+          "name": "geometry_hash",
+          "passed": true,
+          "detail": "Limb measurements still match the hash stored on the socket"
+        },
+        {
+          "name": "derived_cache",
+          "passed": true,
+          "detail": "Derived cache matches the editable parameters"
+        }
+      ]
+    }
+  },
+  "measurements": {
+    "units": "mm",
+    "depth_mm": 151.99999982118607,
+    "volume_mm3": 227419.86199761357,
+    "proximal_opening": {
+      "z_mm": 0.0,
+      "status": "measured",
+      "inner_perimeter_mm": 358.2150247677713,
+      "outer_perimeter_mm": 387.3225371662251,
+      "inner_ml_diameter_mm": 123.06617633494804,
+      "inner_ap_diameter_mm": 104.60624991472338,
+      "outer_ml_diameter_mm": 133.06617633494798,
+      "outer_ap_diameter_mm": 113.10624991472818,
+      "inner_area_mm2": 10067.150609295983,
+      "outer_area_mm2": 11769.675973526293
+    },
+    "wall_thickness_samples": [
+      {
+        "id": "proximal",
+        "z_mm": 0.0,
+        "ml_mm": 4.999999999999972,
+        "ap_mm": 4.250000000002402,
+        "status": "measured",
+        "method": "semi_axis_difference"
+      },
+      {
+        "id": "q25",
+        "z_mm": 35.0,
+        "ml_mm": 5.0,
+        "ap_mm": 4.249999974522851,
+        "status": "measured",
+        "method": "semi_axis_difference"
+      },
+      {
+        "id": "q50",
+        "z_mm": 70.0,
+        "ml_mm": 4.999999999995829,
+        "ap_mm": 4.249999974523888,
+        "status": "measured",
+        "method": "semi_axis_difference"
+      },
+      {
+        "id": "q75",
+        "z_mm": 105.0,
+        "ml_mm": 4.999999999995154,
+        "ap_mm": 4.2499999745189285,
+        "status": "measured",
+        "method": "semi_axis_difference"
+      },
+      {
+        "id": "distal_reference",
+        "z_mm": 126.0,
+        "ml_mm": 5.000000000000007,
+        "ap_mm": 4.249999999997719,
+        "status": "measured",
+        "method": "semi_axis_difference"
+      }
+    ],
+    "distal_end": {
+      "inner_surface_z_mm": 143.99999999999983,
+      "outer_tip_z_mm": 151.99999982118607,
+      "axial_wall_mm": 7.999999821186236,
+      "plug_section_status": "outer_only",
+      "plug_contour_count": 1,
+      "beyond_tip_contour_count": 0
+    },
+    "cavity": {
+      "proximal_opening_open": true,
+      "distal_end_closed": true,
+      "sample_z_mm": 70.0
+    },
+    "sections": [
+      {
+        "id": "proximal",
+        "z_mm": 0.0,
+        "status": "measured",
+        "inner_perimeter_mm": 358.2150247677713,
+        "outer_perimeter_mm": 387.3225371662251,
+        "ml_wall_thickness_mm": 4.999999999999972,
+        "ap_wall_thickness_mm": 4.250000000002402
+      },
+      {
+        "id": "q25",
+        "z_mm": 35.0,
+        "status": "measured",
+        "inner_perimeter_mm": 301.64249811562917,
+        "outer_perimeter_mm": 330.74996160810906,
+        "ml_wall_thickness_mm": 5.0,
+        "ap_wall_thickness_mm": 4.249999974522851
+      },
+      {
+        "id": "q50",
+        "z_mm": 70.0,
+        "status": "measured",
+        "inner_perimeter_mm": 286.6425233198637,
+        "outer_perimeter_mm": 315.7499868123351,
+        "ml_wall_thickness_mm": 4.999999999995829,
+        "ap_wall_thickness_mm": 4.249999974523888
+      },
+      {
+        "id": "q75",
+        "z_mm": 105.0,
+        "status": "measured",
+        "inner_perimeter_mm": 266.64255692547334,
+        "outer_perimeter_mm": 295.75002041793977,
+        "ml_wall_thickness_mm": 4.999999999995154,
+        "ap_wall_thickness_mm": 4.2499999745189285
+      },
+      {
+        "id": "distal_reference",
+        "z_mm": 126.0,
+        "status": "measured",
+        "inner_perimeter_mm": 246.64300493659283,
+        "outer_perimeter_mm": 275.7505173350323,
+        "ml_wall_thickness_mm": 5.000000000000007,
+        "ap_wall_thickness_mm": 4.249999999997719
+      }
+    ]
+  }
+}

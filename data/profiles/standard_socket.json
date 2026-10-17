@@ -1,0 +1,217 @@
+{
+  "socket_model_id": "synthetic-transtibial-socket-standard",
+  "model_version": "1.0.0",
+  "reference_limb_model_id": "synthetic-transtibial-standard",
+  "reference_limb_version": "1.0.0",
+  "reference_limb_geometry_hash": "fdf67e0ea5123eb0d4ae8591b3bd37e0872ca62b7a9ba1b3a7165a41d8e3f6fb",
+  "reference_limb_geometry_hash_note": "SHA-256 of rounded limb measurements: volume to 0.001 mm3, station circumferences and cutting-plane extent to 0.0001 mm. Negative zero is stored as zero so the hash does not change when a cutting plane lands on z = 0 from either side. STEP text is not hashed, because OpenCascade rewrites entity ids and the FILE_NAME timestamp. The builder does not read this field. Validation recomputes it from the limb STEP.",
+  "clinical_use": false,
+  "clinical_recommendation": false,
+  "description": "Synthetic open-proximal transtibial socket shell for a computational demonstration. Every default below is a geometry parameter for this demo, not a clinical recommendation, a liner gap, or a pressure model.",
+  "units": "mm",
+  "coordinate_frame": {
+    "longitudinal_axis": "Z",
+    "ml_axis": "X",
+    "ap_axis": "Y",
+    "proximal_plane_z_mm": 0,
+    "distal_direction": "+Z",
+    "origin": "On the longitudinal axis, in the limb proximal plane"
+  },
+  "anatomical_orientation": {
+    "proximal": "Toward decreasing Z. The opening plane is z = 0. The rolled brim extends to negative Z.",
+    "distal": "+Z, the same direction as the referenced limb.",
+    "anterior": "+Y. This is the demo frame label. The ellipse is symmetric, so the solid does not contain a tibial crest or a patellar-tendon bar.",
+    "posterior": "-Y. Demo frame label only.",
+    "medial_lateral": "X. +X and -X are the two sides of a mirror-symmetric ellipse. This model does not assign medial to a sign, and it does not encode a left or right limb.",
+    "side": null
+  },
+  "morphology": {
+    "family": "smooth_shell",
+    "rationale": "A smooth shell is the generic socket silhouette: noncircular taper, open rolled brim, closed rounded cup. Patellar-tendon bearing and total-surface bearing are different clinical design families. This model implements neither, and it does not invent relief pockets or trimlines.",
+    "not_modeled": [
+      "patellar tendon bar",
+      "supracondylar suspension wings",
+      "fibular-head relief",
+      "tibial-crest relief",
+      "pressure map",
+      "liner"
+    ]
+  },
+  "geometry_generation_method": "wall_profile_revolution_then_y_scale",
+  "construction": {
+    "kernel": "CadQuery/OpenCascade",
+    "note": "The wall is one closed curve in the medial-lateral plane: inner cavity, distal inner cap, distal end wall along the axis, outer cap, outer wall, and a semicircular proximal rim. That curve is revolved about Z and then scaled along Y by the limb ap_over_ml. The limb solid is not scaled and is not boolean-cut."
+  },
+  "alignment_transform": {
+    "type": "identity",
+    "translation_mm": [
+      0,
+      0,
+      0
+    ],
+    "rotation": "none",
+    "note": "The socket opening plane is the limb proximal plane. A non-identity transform is rejected."
+  },
+  "inner_surface_relationship": {
+    "kind": "demo_radial_clearance",
+    "clinical_fit": false,
+    "statement": "The inner medial-lateral radius equals the limb medial-lateral radius plus inner_radial_clearance_mm, plus a proximal brim flare, plus any section offset. Anterior-posterior size is that radius times the limb ap_over_ml. This is not a surface-normal offset, not a liner thickness, and not a statement about fit."
+  },
+  "nominal_wall_thickness_mm": 5.0,
+  "socket_depth_mm": 152.0,
+  "inner_radial_clearance_mm": 2.0,
+  "brim_flare_mm": 8.0,
+  "brim_flare_length_mm": 22.0,
+  "distal_wall_thickness_mm": 8.0,
+  "minimum_wall_thickness_mm": 1.5,
+  "inner_radius_offset_mm": {
+    "proximal": 0.0,
+    "q25": 0.0,
+    "q50": 0.0,
+    "q75": 0.0,
+    "distal_reference": 0.0
+  },
+  "section_wall_extra_mm": {
+    "proximal": 0.0,
+    "q25": 0.0,
+    "q50": 0.0,
+    "q75": 0.0,
+    "distal_reference": 0.0
+  },
+  "proximal_opening_shape": {
+    "type": "ellipse",
+    "plane_z_mm": 0,
+    "note": "The opening is the inner ellipse at z = 0. Its diameters are derived from the limb, the clearance, and the brim flare. ap_over_ml is taken from the limb and is not edited here."
+  },
+  "distal_end_geometry": {
+    "type": "ellipsoidal_cup",
+    "note": "The inner and outer caps are quarter ellipses in the medial-lateral plane. The outer tip is socket_depth_mm below the opening plane. The inner tip is distal_wall_thickness_mm short of that tip, so the cup is closed."
+  },
+  "rim_geometry": {
+    "type": "semicircular_roll",
+    "note": "In the medial-lateral profile the brim is a semicircle whose diameter is the local wall thickness. Revolution makes a rolled lip. The Y scale turns that circle into an ellipse. There is no sharp proximal edge in the profile."
+  },
+  "parameter_roles": {
+    "nominal_wall_thickness_mm": "independently_editable",
+    "socket_depth_mm": "independently_editable",
+    "inner_radial_clearance_mm": "independently_editable",
+    "brim_flare_mm": "independently_editable",
+    "brim_flare_length_mm": "independently_editable",
+    "distal_wall_thickness_mm": "independently_editable",
+    "inner_radius_offset_mm": "independently_editable",
+    "section_wall_extra_mm": "independently_editable",
+    "minimum_wall_thickness_mm": "independently_editable",
+    "limb_radius_profile": "derived_from_limb",
+    "ap_over_ml": "derived_from_limb",
+    "station_z_mm": "derived_from_limb",
+    "cap_start_z_mm": "derived_from_limb",
+    "inner_ml_radius_mm": "derived_from_socket_parameters",
+    "outer_ml_radius_mm": "derived_from_socket_parameters",
+    "opening_ap_diameter_mm": "derived_from_socket_parameters",
+    "inner_tip_z_mm": "derived_from_socket_parameters",
+    "outer_tip_z_mm": "derived_from_socket_parameters",
+    "rim_radius_mm": "derived_from_socket_parameters",
+    "section_perimeters_mm": "measured_from_step",
+    "wall_thickness_samples_mm": "measured_from_step",
+    "solid_volume_mm3": "measured_from_step"
+  },
+  "tolerances": {
+    "circumference_mm": 1.0,
+    "depth_mm": 0.15,
+    "wall_thickness_mm": 0.2,
+    "opening_diameter_mm": 0.3,
+    "area_relative": 0.02,
+    "depth_rationale": "The outer tip is a point. The last cutting plane sits just short of it. 0.15 mm covers that gap.",
+    "circumference_rationale": "Same 1 mm demonstration limit as the limb. It checks the built ellipse against the elliptic integral of the constructed semi-axes.",
+    "wall_rationale": "Medial-lateral thickness is the difference of section semi-axes. Anterior-posterior thickness is that difference times ap_over_ml, because the solid is scaled once along Y. 0.2 mm is the acceptance band around those constructed values.",
+    "minimum_wall_note": "minimum_wall_thickness_mm is an engineering-demo floor for this file. It is not a structural safety factor."
+  },
+  "derived": {
+    "note": "Recomputed from the editable parameters and the limb. Do not edit this block.",
+    "clinical_recommendation": false,
+    "inner_tip_z_mm": 144.0,
+    "outer_tip_z_mm": 152.0,
+    "rim_radius_mm": 2.5,
+    "rim_crest_z_mm": -2.5,
+    "opening_ml_diameter_mm": 123.06617613497528,
+    "opening_ap_diameter_mm": 104.60624971472899,
+    "ap_over_ml": 0.85,
+    "stations": [
+      {
+        "id": "proximal",
+        "z_mm": 0.0,
+        "role": "opening",
+        "inner_ml_semi_mm": 61.53308806748764,
+        "inner_ap_semi_mm": 52.303124857364494,
+        "outer_ml_semi_mm": 66.53308806748764,
+        "outer_ap_semi_mm": 56.553124857364494,
+        "inner_circumference_mm": 358.21502480253463,
+        "outer_circumference_mm": 387.322537203802,
+        "inner_area_mm2": 10110.81630746064,
+        "outer_area_mm2": 11820.726279466284,
+        "ml_wall_thickness_mm": 5.0,
+        "ap_wall_thickness_mm": 4.25
+      },
+      {
+        "id": "q25",
+        "z_mm": 35.0,
+        "role": "cavity",
+        "inner_ml_semi_mm": 51.81531846523805,
+        "inner_ap_semi_mm": 44.04302069545234,
+        "outer_ml_semi_mm": 56.81531846523805,
+        "outer_ap_semi_mm": 48.29302069545234,
+        "inner_circumference_mm": 301.6430049605069,
+        "outer_circumference_mm": 330.7505173617743,
+        "inner_area_mm2": 7169.438470372413,
+        "outer_area_mm2": 8619.84961684856,
+        "ml_wall_thickness_mm": 5.0,
+        "ap_wall_thickness_mm": 4.25
+      },
+      {
+        "id": "q50",
+        "z_mm": 70.0,
+        "role": "cavity",
+        "inner_ml_semi_mm": 49.238664061863666,
+        "inner_ap_semi_mm": 41.852864452584114,
+        "outer_ml_semi_mm": 54.238664061863666,
+        "outer_ap_semi_mm": 46.102864452584114,
+        "inner_circumference_mm": 286.6430049605069,
+        "outer_circumference_mm": 315.75051736177426,
+        "inner_area_mm2": 6474.128584299202,
+        "outer_area_mm2": 7855.733943147261,
+        "ml_wall_thickness_mm": 5.0,
+        "ap_wall_thickness_mm": 4.25
+      },
+      {
+        "id": "q75",
+        "z_mm": 105.0,
+        "role": "cavity",
+        "inner_ml_semi_mm": 45.803124857364494,
+        "inner_ap_semi_mm": 38.93265612875982,
+        "outer_ml_semi_mm": 50.803124857364494,
+        "outer_ap_semi_mm": 43.18265612875982,
+        "inner_circumference_mm": 266.6430049605069,
+        "outer_circumference_mm": 295.75051736177426,
+        "inner_area_mm2": 5602.205231743225,
+        "outer_area_mm2": 6892.0695404205035,
+        "ml_wall_thickness_mm": 5.0,
+        "ap_wall_thickness_mm": 4.25
+      },
+      {
+        "id": "distal_reference",
+        "z_mm": 126.0,
+        "role": "cavity",
+        "inner_ml_semi_mm": 42.367585652865316,
+        "inner_ap_semi_mm": 36.01244780493552,
+        "outer_ml_semi_mm": 47.367585652865316,
+        "outer_ap_semi_mm": 40.26244780493552,
+        "inner_circumference_mm": 246.64300496050691,
+        "outer_circumference_mm": 275.75051736177426,
+        "inner_area_mm2": 4793.317874091978,
+        "outer_area_mm2": 5991.441132598474,
+        "ml_wall_thickness_mm": 5.0,
+        "ap_wall_thickness_mm": 4.25
+      }
+    ]
+  }
+}

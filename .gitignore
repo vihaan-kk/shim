@@ -16,6 +16,8 @@ workspace/*
 *.3mf
 *.gcode
 !data/openlimbtt/*.stl
+!data/reference/standardized_limb.stl
+!data/reference/standardized_socket.stl
 
 # macOS
 .DS_Store

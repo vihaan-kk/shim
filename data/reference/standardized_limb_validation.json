@@ -1,0 +1,301 @@
+{
+  "model_id": "synthetic-transtibial-standard",
+  "model_version": "1.0.0",
+  "clinical_use": false,
+  "passed": true,
+  "tolerances_mm": {
+    "circumference": 1.0,
+    "length": 0.05,
+    "circumference_rationale": "1 mm is the acceptance limit for this demonstration. It is about 0.3 to 0.4 percent of these perimeters (235 to 300 mm). The inputs are exact numbers, so the check is tighter than physical tape error on purpose. It still leaves room for kernel tolerance while rejecting a section that missed its target.",
+    "length_rationale": "The proximal face is constructed at z = 0 and the tip point at z = 140. Acceptance uses cutting planes. A non-uniform scale can leave surface poles outside the trimmed solid, so the kernel box is recorded but not used as the check. The last plane that still cuts a curve sits just short of the point tip. 0.05 mm covers that gap."
+  },
+  "derived_semi_axes": [
+    {
+      "id": "proximal",
+      "z_mm": 0.0,
+      "target_circumference_mm": 300.0,
+      "ap_over_ml": 0.85,
+      "ap_semi_axis_mm": 43.803124857364494,
+      "ml_semi_axis_mm": 51.53308806748764,
+      "integral_circumference_mm": 299.99999999999994,
+      "ramanujan_circumference_mm": 299.9999999999999
+    },
+    {
+      "id": "q25",
+      "z_mm": 35.0,
+      "target_circumference_mm": 290.0,
+      "ap_over_ml": 0.85,
+      "ap_semi_axis_mm": 42.34302069545234,
+      "ml_semi_axis_mm": 49.81531846523805,
+      "integral_circumference_mm": 290.0,
+      "ramanujan_circumference_mm": 289.9999999999999
+    },
+    {
+      "id": "q50",
+      "z_mm": 70.0,
+      "target_circumference_mm": 275.0,
+      "ap_over_ml": 0.85,
+      "ap_semi_axis_mm": 40.15286445258412,
+      "ml_semi_axis_mm": 47.238664061863666,
+      "integral_circumference_mm": 275.0,
+      "ramanujan_circumference_mm": 274.9999999999999
+    },
+    {
+      "id": "q75",
+      "z_mm": 105.0,
+      "target_circumference_mm": 255.0,
+      "ap_over_ml": 0.85,
+      "ap_semi_axis_mm": 37.23265612875982,
+      "ml_semi_axis_mm": 43.803124857364494,
+      "integral_circumference_mm": 254.99999999999997,
+      "ramanujan_circumference_mm": 254.9999999999999
+    },
+    {
+      "id": "distal_reference",
+      "z_mm": 126.0,
+      "target_circumference_mm": 235.0,
+      "ap_over_ml": 0.85,
+      "ap_semi_axis_mm": 34.312447804935516,
+      "ml_semi_axis_mm": 40.367585652865316,
+      "integral_circumference_mm": 235.0,
+      "ramanujan_circumference_mm": 234.9999999999999
+    }
+  ],
+  "built_solid": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "valid_solid",
+        "passed": true,
+        "detail": "BRepCheck_Analyzer.IsValid"
+      },
+      {
+        "name": "one_solid",
+        "passed": true,
+        "detail": "solid count 1"
+      },
+      {
+        "name": "positive_volume",
+        "passed": true,
+        "detail": "signed volume 798752.832 mm^3"
+      },
+      {
+        "name": "longitudinal_extent",
+        "passed": true,
+        "detail": "cutting planes from -1e-06 to 140.0 mm, length 140.000001 mm, target 140.0 mm"
+      },
+      {
+        "name": "distal_closed",
+        "passed": true,
+        "detail": "section at z=139.5 mm is 62.24299 mm (1 edges); section past the tip has 0 edges"
+      },
+      {
+        "name": "circumference_proximal",
+        "passed": true,
+        "detail": "z=0.0 mm, measured 300.0 mm, target 300.0 mm, error -0.0 mm, edges 1"
+      },
+      {
+        "name": "circumference_q25",
+        "passed": true,
+        "detail": "z=35.0 mm, measured 289.999513 mm, target 290.0 mm, error -0.000487 mm, edges 1"
+      },
+      {
+        "name": "circumference_q50",
+        "passed": true,
+        "detail": "z=70.0 mm, measured 274.999538 mm, target 275.0 mm, error -0.000462 mm, edges 1"
+      },
+      {
+        "name": "circumference_q75",
+        "passed": true,
+        "detail": "z=105.0 mm, measured 254.999572 mm, target 255.0 mm, error -0.000428 mm, edges 1"
+      },
+      {
+        "name": "circumference_distal_reference",
+        "passed": true,
+        "detail": "z=126.0 mm, measured 235.0 mm, target 235.0 mm, error -0.0 mm, edges 1"
+      }
+    ],
+    "material_extent_mm": {
+      "zmin_mm": -1e-06,
+      "zmax_mm": 140.0,
+      "length_mm": 140.000001
+    },
+    "kernel_bounding_box_mm": {
+      "xmin_mm": -51.67091,
+      "ymin_mm": -43.92919,
+      "zmin_mm": -0.059308,
+      "xmax_mm": 51.670994,
+      "ymax_mm": 43.929225,
+      "zmax_mm": 141.235933,
+      "length_mm": 141.295241
+    },
+    "signed_volume_mm3": 798752.832,
+    "measurements": [
+      {
+        "id": "proximal",
+        "z_mm": 0.0,
+        "target_circumference_mm": 300.0,
+        "measured_circumference_mm": 300.0,
+        "error_mm": -0.0,
+        "edge_count": 1
+      },
+      {
+        "id": "q25",
+        "z_mm": 35.0,
+        "target_circumference_mm": 290.0,
+        "measured_circumference_mm": 289.999513,
+        "error_mm": -0.000487,
+        "edge_count": 1
+      },
+      {
+        "id": "q50",
+        "z_mm": 70.0,
+        "target_circumference_mm": 275.0,
+        "measured_circumference_mm": 274.999538,
+        "error_mm": -0.000462,
+        "edge_count": 1
+      },
+      {
+        "id": "q75",
+        "z_mm": 105.0,
+        "target_circumference_mm": 255.0,
+        "measured_circumference_mm": 254.999572,
+        "error_mm": -0.000428,
+        "edge_count": 1
+      },
+      {
+        "id": "distal_reference",
+        "z_mm": 126.0,
+        "target_circumference_mm": 235.0,
+        "measured_circumference_mm": 235.0,
+        "error_mm": -0.0,
+        "edge_count": 1
+      }
+    ]
+  },
+  "exports": {
+    "passed": true,
+    "step_reimport": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "valid_solid",
+          "passed": true,
+          "detail": "BRepCheck_Analyzer.IsValid"
+        },
+        {
+          "name": "one_solid",
+          "passed": true,
+          "detail": "solid count 1"
+        },
+        {
+          "name": "positive_volume",
+          "passed": true,
+          "detail": "signed volume 798752.832 mm^3"
+        },
+        {
+          "name": "longitudinal_extent",
+          "passed": true,
+          "detail": "cutting planes from -1e-06 to 140.0 mm, length 140.0 mm, target 140.0 mm"
+        },
+        {
+          "name": "distal_closed",
+          "passed": true,
+          "detail": "section at z=139.5 mm is 62.24299 mm (1 edges); section past the tip has 0 edges"
+        },
+        {
+          "name": "circumference_proximal",
+          "passed": true,
+          "detail": "z=0.0 mm, measured 300.0 mm, target 300.0 mm, error -0.0 mm, edges 1"
+        },
+        {
+          "name": "circumference_q25",
+          "passed": true,
+          "detail": "z=35.0 mm, measured 289.999513 mm, target 290.0 mm, error -0.000487 mm, edges 1"
+        },
+        {
+          "name": "circumference_q50",
+          "passed": true,
+          "detail": "z=70.0 mm, measured 274.999538 mm, target 275.0 mm, error -0.000462 mm, edges 1"
+        },
+        {
+          "name": "circumference_q75",
+          "passed": true,
+          "detail": "z=105.0 mm, measured 254.999572 mm, target 255.0 mm, error -0.000428 mm, edges 1"
+        },
+        {
+          "name": "circumference_distal_reference",
+          "passed": true,
+          "detail": "z=126.0 mm, measured 235.0 mm, target 235.0 mm, error -0.0 mm, edges 1"
+        }
+      ],
+      "material_extent_mm": {
+        "zmin_mm": -1e-06,
+        "zmax_mm": 140.0,
+        "length_mm": 140.0
+      },
+      "kernel_bounding_box_mm": {
+        "xmin_mm": -51.611701,
+        "ymin_mm": -43.869946,
+        "zmin_mm": -0.0,
+        "xmax_mm": 51.611701,
+        "ymax_mm": 43.869946,
+        "zmax_mm": 140.0,
+        "length_mm": 140.0
+      },
+      "signed_volume_mm3": 798752.832,
+      "measurements": [
+        {
+          "id": "proximal",
+          "z_mm": 0.0,
+          "target_circumference_mm": 300.0,
+          "measured_circumference_mm": 300.0,
+          "error_mm": -0.0,
+          "edge_count": 1
+        },
+        {
+          "id": "q25",
+          "z_mm": 35.0,
+          "target_circumference_mm": 290.0,
+          "measured_circumference_mm": 289.999513,
+          "error_mm": -0.000487,
+          "edge_count": 1
+        },
+        {
+          "id": "q50",
+          "z_mm": 70.0,
+          "target_circumference_mm": 275.0,
+          "measured_circumference_mm": 274.999538,
+          "error_mm": -0.000462,
+          "edge_count": 1
+        },
+        {
+          "id": "q75",
+          "z_mm": 105.0,
+          "target_circumference_mm": 255.0,
+          "measured_circumference_mm": 254.999572,
+          "error_mm": -0.000428,
+          "edge_count": 1
+        },
+        {
+          "id": "distal_reference",
+          "z_mm": 126.0,
+          "target_circumference_mm": 235.0,
+          "measured_circumference_mm": 235.0,
+          "error_mm": -0.0,
+          "edge_count": 1
+        }
+      ]
+    },
+    "stl": {
+      "name": "stl_mesh",
+      "passed": true,
+      "detail": "247915 triangles, 12395834 bytes"
+    }
+  },
+  "files": {
+    "step": "/Users/yutiangong/Desktop/shim-hackathon/shim/data/reference/standardized_limb.step",
+    "stl": "/Users/yutiangong/Desktop/shim-hackathon/shim/data/reference/standardized_limb.stl"
+  },
+  "statement": "Synthetic demonstration solid. Measurements below are CAD section lengths, not anatomical or clinical measurements."
+}

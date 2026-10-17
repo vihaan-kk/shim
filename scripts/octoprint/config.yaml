@@ -1,0 +1,20 @@
+# OctoPrint settings for local development with the Virtual Printer.
+# start.sh copies this into workspace/octoprint/ and adds the API key from .env.
+# Holds no secrets, so it is safe to commit.
+server:
+  firstRun: false
+  onlineCheck:
+    enabled: false
+  pluginBlacklist:
+    enabled: false
+serial:
+  port: VIRTUAL
+  baudrate: 0
+  autoconnect: true
+plugins:
+  virtual_printer:
+    enabled: true
+  tracking:
+    enabled: false
+  announcements:
+    enabled: false

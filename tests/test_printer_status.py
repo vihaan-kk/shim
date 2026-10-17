@@ -1,5 +1,7 @@
 from tools.printer.octoprint_client import OctoPrintError
-from tools.printer.tools import read_printer_status
+from tests.real_printer import pt
+
+read_printer_status = pt.read_printer_status
 
 
 class FakeClient:

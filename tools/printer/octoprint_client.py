@@ -6,6 +6,7 @@ command means "accepted", not "done"; callers must read state back with GET.
 from __future__ import annotations
 
 import json
+import uuid
 import urllib.error
 import urllib.request
 from typing import Any, Optional
@@ -59,3 +60,26 @@ class OctoPrintClient:
 
     def pause_job(self) -> None:
         self._request("POST", "/api/job", {"command": "pause", "action": "pause"})
+
+    def cancel_job(self) -> None:
+        self._request("POST", "/api/job", {"command": "cancel"})
+
+    def upload_file(self, filename: str, content: bytes) -> dict:
+        """Upload G-code to local storage. Does not select or print it."""
+        boundary = uuid.uuid4().hex
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            "Content-Type: application/octet-stream\r\n\r\n"
+        ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(self._base + "/api/files/local", data=body, method="POST")
+        req.add_header("X-Api-Key", self._key)
+        req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+        try:
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+                raw = resp.read()
+                return json.loads(raw) if raw else {}
+        except urllib.error.HTTPError as e:
+            raise OctoPrintError(f"upload returned HTTP {e.code}", e.code) from None
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            raise OctoPrintError(f"upload failed: {type(e).__name__}") from None

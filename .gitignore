@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime output (keep the folder itself)
+workspace/*
+!workspace/.gitkeep
+
+# Large meshes and print files
+*.stl
+*.3mf
+*.gcode
+!data/openlimbtt/*.stl
+
+# macOS
+.DS_Store

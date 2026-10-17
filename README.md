@@ -1,6 +1,6 @@
 # Transtibial Prosthetic Socket Agent
 
-An SLM-powered agent that customizes a synthetic below-knee residual limb from a short questionnaire, builds a separate demonstration socket shell, starts a confirmed virtual 3D print, and watches that print until it finishes.
+An SLM-powered agent for a synthetic below-knee residual limb. The session opens on that limb in a 3D viewer, with its measurement profile and a chat beside it. Confirming the limb opens the demonstration socket. Confirming the socket opens the virtual printer. The same agent stays available on every page.
 
 The model does not deform meshes or operate the printer. It chooses a tool and fills in structured arguments. Deterministic Python code checks those arguments, edits geometry, validates the result, and returns a typed result. The agent asks when a measurement is missing or inconsistent, keeps earlier confirmed values, and never starts a print without a separate human confirmation.
 
@@ -10,7 +10,7 @@ The model does not deform meshes or operate the printer. It chooses a tool and f
 
 **Clinical boundary:** measurement-driven reconstruction is an approximation of a standardized template. It is not a reconstruction of a person's anatomy. Generated sockets are non-wearable demonstration prototypes. A passing geometry check means the mesh is closed, inside the configured wall and printer limits, and ready to slice. It does not establish fit, comfort, load transfer, or safety on a person.
 
-The innovation this prototype is built to show is the model's ability to coordinate a multi-stage, stateful path from a transtibial questionnaire to a virtual print.
+The innovation this prototype is built to show is the model's ability to coordinate a multi-stage, stateful path from the residual-limb page, through a confirmed socket, to a virtual print.
 
 ## How to read this plan
 
@@ -26,7 +26,7 @@ The innovation this prototype is built to show is the model's ability to coordin
 2. [Scope and Nonclinical Demonstration Boundary](#2-scope-and-nonclinical-demonstration-boundary)
 3. [Target User Experience](#3-target-user-experience)
 4. [OpenLimbTT Dataset and the Standardized Shape](#4-openlimbtt-dataset-and-the-standardized-shape)
-5. [Practitioner Questionnaire and Measurement Schema](#5-practitioner-questionnaire-and-measurement-schema)
+5. [Measurement Profile and Schema](#5-measurement-profile-and-schema)
 6. [Residual-Limb STL Customization Algorithm](#6-residual-limb-stl-customization-algorithm)
 7. [Conversational Refinement and Version Control](#7-conversational-refinement-and-version-control)
 8. [Prosthetic Socket CAD Generation](#8-prosthetic-socket-cad-generation)
@@ -46,12 +46,11 @@ Preparing even a demonstration below-knee socket means importing a shape, decidi
 
 This agent is that demonstration path, for transtibial geometry only:
 
-1. The practitioner answers the questionnaire. Every session uses the same standardized transtibial shape, the OpenLimbTT mean skin, applied automatically.
-2. The questions ask for residual length, proximal circumference, and distal circumference, in millimetres.
-3. The model calls deterministic tools that copy the template, deform it, and write a new residual-limb STL.
-4. They can correct a number or ask for a supported shape change in ordinary language. Each accepted change writes another limb revision and leaves other confirmed measurements unchanged.
-5. The model then calls a separate CAD tool that builds a demonstration socket shell around the current limb revision. The limb STL is preserved.
-6. After geometric validation, slicing, and an explicit confirmation, the agent starts a virtual print. A monitor shows the current step and the latest OctoPrint fields. The practitioner can ask how the print is going, and the answer comes from that read-back. The agent then writes a fabrication report.
+1. The session opens on the residual-limb page. The left side is the 3D model of the standardized transtibial shape, the OpenLimbTT mean skin. The right side is the measurement profile above the agent chat.
+2. The profile shows the required fields and the optional fields together. Required: residual length, proximal circumference, and distal circumference, in millimetres. Optional: mid circumference, anterior-posterior and medial-lateral widths, distal-end shape, and side.
+3. The user edits the profile or asks the agent to change a measurement. The model calls deterministic tools that copy the template, deform it, and write a new residual-limb STL. The viewer updates. Each accepted change writes another limb revision and leaves other confirmed measurements unchanged.
+4. Confirm on this page accepts the current limb and opens the socket page. A separate CAD tool builds a demonstration socket shell around that limb revision. The limb STL is preserved. The same agent can change the socket.
+5. Confirm on the socket page opens the printer page. After geometric validation, slicing, and an explicit print confirmation, the agent starts a virtual print. The page shows the print metadata. The practitioner can ask how the print is going, and the answer comes from that read-back. The agent then writes a fabrication report.
 
 Four stages stay separate.
 
@@ -68,40 +67,49 @@ The prototype customizes synthetic transtibial residual limbs and generates belo
 
 In scope:
 
-- One standardized transtibial shape, OpenLimbTT `Mean-Skin.stl`, applied to every session.
-- A questionnaire the practitioner answers directly: residual length and two circumferences.
-- Conversational corrections that update one parameter.
+- One standardized transtibial shape, OpenLimbTT `Mean-Skin.stl`, shown in the limb viewer at the start of every session.
+- A measurement profile beside that viewer: required length and two circumferences, plus the optional mid circumference, AP/ML widths, distal shape, and side.
+- Conversational corrections, in the chat under that profile, that update one parameter.
 - A constant-offset demonstration shell, mesh checks, one slicing profile, and a gated virtual print.
 - A live monitor of that virtual print: the current step, job metadata from the OctoPrint API, and chat answers that quote the same read-back.
 - An audit report that cites OpenLimbTT and states the nonclinical limit.
 
 Outside this prototype:
 
-- Identifiable scans, medical records, or any claim that the questionnaire recovers a patient.
+- Identifiable scans, medical records, or any claim that the measurement profile recovers a patient.
 - Clinical rectification, liner prescription, suspension, alignment, or a test-socket fitting.
 - Wearable sockets and physical-printer operation.
 - Any statement that a geometric clearance or a wall thickness is a validated fit.
 - Decorative patterns, a general mesh editor, and biomechanical simulation.
 
-A tape measurement is something a trained practitioner can take at the point of care. Placing that tape on the correct anatomical level is a palpation skill. The questionnaire shows a diagram and names one landmark. The system does not infer a landmark the practitioner did not identify.
+A tape measurement is something a trained practitioner can take at the point of care. Placing that tape on the correct anatomical level is a palpation skill. The measurement profile names one landmark. The system does not infer a landmark the practitioner did not identify.
 
 ## 3. Target User Experience
 
 **User:** a prosthetics practitioner, technician, or researcher who can take a residual-limb measurement and should not have to operate CAD, a slicer, and printer software by hand.
 
-**Session:**
+**Session:** three pages. The session does not start with a questionnaire. The standardized limb is already on screen.
 
-1. The page opens on the questionnaire. The practitioner answers the questions. The mean transtibial skin is the shape behind every answer.
-2. The required questions are residual-limb length, proximal circumference, and distal circumference, each in millimetres. Optional questions stay collapsed. If a required answer is missing, the agent asks for that measurement by name.
-3. The limb viewer shows the customized residual-limb STL, labeled as the limb, not the socket.
-4. Chat and the form write the same measurement document. "Change the proximal circumference to 310 mm" updates that field only.
-5. A comparison view shows the previous and current limb revisions with measured differences.
-6. "Generate a demonstration socket" produces a second STL. The socket viewer is a separate panel.
-7. Validation cards report mesh checks. They are labeled geometric checks.
-8. The practitioner approves the single print profile, then confirms the virtual print on a different button.
-9. The print monitor shows the current step and the latest OctoPrint fields. The same chat stays open. "How is the print going?" is answered from a fresh printer read, and those numbers are the ones on the monitor.
+**1. Residual limb**
 
-The page never overlays the limb and the socket as if they were one object. Titles stay "Residual limb" and "Socket shell."
+| Region | Contents |
+|---|---|
+| Left | The 3D residual-limb model, titled "Residual limb." |
+| Right, top | The measurement profile. Required and optional fields are both visible. |
+| Right, bottom | The agent chat, connected to the backend. |
+| Confirm | Accepts the current limb and opens the socket page. |
+
+Required profile fields are residual-limb length, proximal circumference, and distal circumference, each in millimetres. Optional fields are mid circumference, anterior-posterior depth and medial-lateral width, distal-end shape, and side. Chat and the profile write the same measurement document. "Change the proximal circumference to 310 mm" updates that field only and refreshes the model. If a required field is empty, the agent asks for that measurement by name and Confirm stays disabled.
+
+**2. Socket**
+
+Confirm on the limb page builds the demonstration socket around the confirmed limb revision and opens this page. The user sees the socket model, titled "Socket shell." The same agent is on the page and can change the socket, for example wall thickness or depth. The limb file is not replaced. Validation results are labeled geometric checks. Confirm on this page accepts the current socket and opens the printer page.
+
+**3. Printer**
+
+The printer page shows the virtual job: current step, completion, elapsed time, time left when OctoPrint reports it, file name, filament estimate, virtual port, and temperatures when they are present. The same agent remains. "How is the print going?" is answered from a fresh printer read, and those numbers are the ones on the page. Slice confirmation and print confirmation are different actions. Print stays disabled until readiness is true and a slice exists.
+
+The limb and the socket are never drawn as one object. Each has its own page and its own title.
 
 ## 4. OpenLimbTT Dataset and the Standardized Shape
 
@@ -134,7 +142,7 @@ Binary STL size is `84 + 50 × triangles`. These published sizes divide evenly:
 
 ### 4.2 The one template
 
-Every session deforms this one shape. The questionnaire supplies the measurements. The practitioner does not pick among shapes.
+Every session deforms this one shape. The measurement profile on the limb page supplies the measurements. The practitioner does not pick among shapes.
 
 | ID | Shape | Published file |
 |---|---|---|
@@ -163,7 +171,7 @@ reference_to_distal_mm: <measured after scaling>
 
 The original file is stored unchanged. Customization always copies it. Derived meshes stay under CC BY-SA 4.0, and the fabrication report cites the paper.
 
-## 5. Practitioner Questionnaire and Measurement Schema
+## 5. Measurement Profile and Schema
 
 ### 5.1 What measurements can support
 
@@ -261,25 +269,29 @@ Form ranges are what the page accepts. The mean skin then applies a tighter wind
 
 Scars, pain, skin condition, knee contracture, strength, liner model, body weight, and activity level can be stored in the session note. They are `unsupported_field` on a geometry call. Knee flexion is visible in OpenLimbTT mode 4 as a scan artifact; the template is not bent to match a contracture. Wall thickness is chosen later as a socket argument, not from body weight.
 
-### 5.4 Minimum questionnaire
+### 5.4 Measurement profile
 
-The questionnaire is the start of the session. These three questions are on screen when the page loads:
+These fields are the profile on the residual-limb page. They are visible when the page loads, next to the 3D limb. The page does not open on a questionnaire.
 
-| Field | Question |
-|---|---|
-| `length_mm` | With the knee extended, what is the length from the mid-patellar tendon to the distal end, in millimetres? |
-| Station `P` | What is the circumference 40 mm below the mid-patellar tendon, in millimetres? |
-| Station `D` | What is the circumference 40 mm above the distal end, in millimetres? |
+| Field | Required | Shown as |
+|---|---|---|
+| `length_mm` | Yes | With the knee extended, length from the mid-patellar tendon to the distal end, in millimetres. |
+| Station `P` | Yes | Circumference 40 mm below the mid-patellar tendon, in millimetres. |
+| Station `D` | Yes | Circumference 40 mm above the distal end, in millimetres. |
+| Station `M` | No | Circumference halfway between the proximal and distal levels. |
+| AP and ML at P | No | Anterior-posterior depth and medial-lateral width, both or neither. |
+| Distal-end shape | No | Template, slightly rounder, or slightly more tapered. |
+| Side | No | Left or right. Default is the template side. |
 
-Mid circumference, AP/ML, distal shape, and side stay behind "more detail" and are accepted when the practitioner answers them. The form states that the answers adjust the mean OpenLimbTT skin and do not reconstruct a residual limb. If a required answer is empty, `ask_user` repeats that question.
+The profile states that the values adjust the mean OpenLimbTT skin and do not reconstruct a residual limb. If a required field is empty, `ask_user` asks for that field and the limb-page Confirm stays disabled.
 
-Natural language fills the same document. "About 15 cm long, 30 cm near the top and 24 cm near the end" becomes `length_mm: 150`, P `300`, D `240`, with `precision: approximate`. The agent repeats the numbers before the first customization.
+Natural language fills the same document. "About 15 cm long, 30 cm near the top and 24 cm near the end" becomes `length_mm: 150`, P `300`, D `240`, with `precision: approximate`. The agent repeats the numbers before the first customization. The user can also type the values into the profile. Confirm on this page is what moves the session to the socket page.
 
 ## 6. Residual-Limb STL Customization Algorithm
 
 ### 6.1 Options
 
-| Approach | Fit to OpenLimbTT and this questionnaire | Decision |
+| Approach | Fit to OpenLimbTT and this measurement profile | Decision |
 |---|---|---|
 | Axial warp, then cross-sectional radial scale with monotone interpolation | Uses length and circumferences directly. Moves existing vertices, so face count stays constant. One deterministic tool. | **MVP.** |
 | Global uniform scale | One factor cannot meet a length and two circumferences. | Labeled fallback only. |
@@ -358,7 +370,7 @@ Limb revisions are `r1`, `r2`, … Socket revisions are a separate series and po
 
 ## 8. Prosthetic Socket CAD Generation
 
-The socket tool reads a limb revision and writes a new mesh. It does not read the questionnaire and it does not rectify. The limb STL stays on disk.
+The socket tool reads the confirmed limb revision and writes a new mesh. It does not read the measurement profile as a socket prescription, and it does not rectify. The limb STL stays on disk. The socket page opens only after Confirm on the limb page.
 
 Geometric precedents, not fit rules:
 
@@ -381,7 +393,7 @@ Proposed procedure for `generate_socket_shell`:
 
 `modify_socket_geometry` regenerates from the same limb revision. Fields omitted from the call are copied from the parent socket. A locked socket field changes only with `correction: true`.
 
-If the offset fails, the limb revision is kept and nothing is uploaded. One retry may set `rim_radius_mm` to 0. A second failure stops. The last-resort stand-in is a pre-authored closed shell around unedited `tt_mean` at the default wall, labeled as a stand-in that does not reflect the questionnaire. It exists so the print path can be shown. The report says the measurements were not applied to the shell.
+If the offset fails, the limb revision is kept and nothing is uploaded. One retry may set `rim_radius_mm` to 0. A second failure stops. The last-resort stand-in is a pre-authored closed shell around unedited `tt_mean` at the default wall, labeled as a stand-in that does not reflect the measurement profile. It exists so the print path can be shown. The report says the measurements were not applied to the shell.
 
 ## 9. Geometry Validation
 
@@ -515,7 +527,7 @@ A failed limb edit stays on the previous `limb_current`. A lost printer link mov
 
 | Phase | Tools offered |
 |---|---|
-| `empty` | `ask_user` repeats any unanswered required question. The questionnaire is already showing length, P, and D. |
+| `empty` | The limb page is showing the model, the profile, and the chat. `ask_user` asks for any empty required field: length, P, or D. |
 | `measurements_ready` | `validate_measurements`, then `customize_residual_limb` |
 | `limb_current` | `measure_customized_limb`, `compare_limb_versions`, `export_customized_limb_stl`, `validate_measurements`, `customize_residual_limb`, `generate_socket_shell` |
 | `socket_current` | `modify_socket_geometry`, `validate_socket_geometry`, `export_socket_stl` |
@@ -533,7 +545,7 @@ Every object schema sets `additionalProperties: false`.
 
 ### A. Template and measurement tools
 
-`list_limb_templates` and `get_required_measurements` are not in the registry. The shape is always `tt_mean`, and the questionnaire already asks for length, P, and D.
+`list_limb_templates` and `get_required_measurements` are not in the registry. The shape is always `tt_mean`. The limb page already shows length, P, and D as required, and M, AP/ML, distal shape, and side as optional.
 
 #### `inspect_limb_template`
 
@@ -772,7 +784,7 @@ Library: filesystem.
 
 Build the first demonstration shell from a limb revision. **Uncertain.** Offset of this open skin is the main CAD risk.
 
-Precondition: limb revision passed its own measurement check. No socket parameter is taken from the questionnaire.
+Precondition: the limb page was confirmed and that revision passed its measurement check. No socket parameter is taken from the limb measurement profile.
 
 Required: `limb_id`, `revision_id`. Optional: `clearance_mm` 0–3 default 1.5, `wall_thickness_mm` 2–6 default 4, `trim_fraction` 0.05–0.35 default 0.15, `rim_radius_mm` 0–3 default 1.
 
@@ -1178,23 +1190,36 @@ A chat answer may state the step, completion, elapsed time, time left when prese
 
 ## 13. Frontend Architecture
 
-One page. No CAD editor.
+Three pages. No CAD editor. The session does not start with a questionnaire. The same agent chat is on every page and talks to the backend.
+
+### Residual limb
 
 | Region | Behavior |
 |---|---|
-| Shape label | "Mean transtibial skin (OpenLimbTT)," shown as a caption above the questionnaire. |
-| Questionnaire | The first thing on the page. Length, P, and D are required questions. M, AP/ML, distal shape, and side sit behind "more detail." |
-| Limb viewer | Title "Residual limb." Loads `role: residual_limb` only. |
-| Chat | Writes the same locks as the form. |
-| Comparison | Side-by-side limb revisions plus the `compare_limb_versions` table. |
-| Socket viewer | Title "Socket shell." Separate component, separate URL, `role: socket_shell`. |
-| Validation | Certificate checks, each named as a geometric check. |
-| Print bar | Slice confirmation and print confirmation are different buttons. Print stays disabled until readiness is true and a slice exists. |
-| Print monitor | Appears after a verified start. Shows the current step, completion, time, file, filament estimate, virtual port, and temperatures when OctoPrint reports them. Updates from the server poll, including while the chat is idle. |
-| Chat during print | Stays on the same page. A progress question is sent to the agent, which calls `get_printer_status` and quotes that snapshot. |
+| Left | 3D viewer titled "Residual limb." Loads the current limb STL only. The standardized shape is visible when the page opens. |
+| Right, top | Measurement profile. Required: length, proximal circumference, distal circumference. Optional, on the same profile: mid circumference, AP/ML widths, distal-end shape, and side. |
+| Right, bottom | Agent chat. Edits the same measurement document as the profile. |
+| Confirm | Disabled while a required field is empty. Accepts the current limb, builds the demonstration socket for that revision, and opens the socket page. |
+
+### Socket
+
+| Region | Behavior |
+|---|---|
+| Viewer | 3D viewer titled "Socket shell." Loads the socket STL for the confirmed limb revision. The limb file is unchanged. |
+| Validation | Geometric checks for the shell, each named as a geometric check. |
+| Agent | The same chat. The user can ask for a supported socket change. The viewer updates from the new socket STL. |
+| Confirm | Accepts the current socket and opens the printer page. |
+
+### Printer
+
+| Region | Behavior |
+|---|---|
+| Job metadata | Current step, completion, elapsed time, time left when reported, file name, filament estimate, virtual port, and temperatures when OctoPrint reports them. Updates from the server poll, including while the chat is idle. |
+| Print actions | Slice confirmation and print confirmation are different controls. Print stays disabled until readiness is true and a slice exists. |
+| Agent | The same chat. A progress question is sent to the agent, which calls `get_printer_status` and quotes that snapshot. |
 | Report | Download at the end. It includes the last observed step. |
 
-The browser displays STL URLs. It does not recompute geometry. Proposed stack: a small Python app and [three.js](https://threejs.org/). The measurement document and the phase live on the server.
+The browser displays STL URLs. It does not recompute geometry. The limb and the socket stay on separate pages. Proposed stack: a small Python app and [three.js](https://threejs.org/). The measurement document, the socket revision, and the print phase live on the server.
 
 ## 14. End-to-End Demo Scenarios
 
@@ -1202,22 +1227,22 @@ Target length 4–6 minutes for the happy path. One recovery can be live. The ot
 
 ### 14.1 Happy path
 
-1. The questionnaire asks for length, proximal circumference, and distal circumference. The mean transtibial skin is already the shape those answers will modify.
-2. The user answers 150 mm, 300 mm, and 240 mm.
-3. Any blank required question is asked again before a mesh call.
-4. `validate_measurements` then `customize_residual_limb`.
-5. `export_customized_limb_stl` feeds the limb viewer. `measure_customized_limb` is read back in chat.
-6. "Change the proximal circumference to 310 mm." Validation sets `correction` on P only. Revision `r2`.
+1. The residual-limb page is already open. The left side shows the mean transtibial skin. The profile on the right shows length, proximal circumference, and distal circumference, plus the optional fields.
+2. The user sets 150 mm, 300 mm, and 240 mm in the profile, or says those numbers in the chat.
+3. Any empty required field is asked again before a mesh call. Confirm stays disabled until length, P, and D are filled.
+4. `validate_measurements` then `customize_residual_limb`. The left viewer reloads the new limb STL.
+5. `measure_customized_limb` is read back in chat.
+6. "Change the proximal circumference to 310 mm." Validation sets `correction` on P only. Revision `r2`. The profile and the model both update.
 7. `compare_limb_versions` shows P changed and D unchanged.
 8. "The residual limb should be 15 mm shorter." New length 135 mm. Revision `r3`. Circumferences stay locked.
-9. The user asks for a demonstration socket.
-10. `generate_socket_shell` writes a socket STL. The limb file remains.
-11. `validate_socket_geometry` returns a certificate.
+9. The user presses Confirm. The session opens the socket page and `generate_socket_shell` writes a socket STL for that limb revision. The limb file remains.
+10. On the socket page, the user can ask the same agent to change the socket. `validate_socket_geometry` returns a certificate.
+11. The user presses Confirm. The session opens the printer page.
 12. The user approves `tt_draft_028`.
 13. `slice_model` reports time and filament.
 14. The user presses the print confirmation.
-15. `start_print`, then the monitor polls until `get_printer_status` shows the Printing step.
-16. The user asks "How is the print going?" The agent calls `get_printer_status` and answers with the step, completion, and time left from that snapshot.
+15. `start_print`, then the printer page polls until `get_printer_status` shows the Printing step.
+16. The user asks "How is the print going?" The agent calls `get_printer_status` and answers with the step, completion, and time left from that snapshot. The page shows the same metadata.
 17. When the ledger has `verified_printing` and the printer is operational again with no error flag, the step changes to Finished.
 18. The report is saved, including that last step.
 
@@ -1278,11 +1303,13 @@ After a verified start, the injector sends `!!DEBUG:action_disconnect` with the 
 
 | Choice | MVP | Later |
 |---|---|---|
-| Shape | `tt_mean` for every session. The user answers the questionnaire. | — |
-| Questionnaire | Length, P, D. | M, AP/ML, distal shape, side. |
+| Shape | `tt_mean` for every session, already in the limb viewer. | — |
+| Limb page | 3D limb on the left. Measurement profile on the right, required and optional fields together. Agent chat under the profile. Confirm opens the socket page. | — |
+| Profile fields | Required: length, P, D. Optional, shown on the same profile: M, AP/ML, distal shape, side. | — |
+| Socket page | Socket model after the limb is confirmed. The same agent can change the socket. Confirm opens the printer page. | — |
+| Print page | Job metadata and the same agent for progress questions. `tt_draft_028`, one virtual start. | A second profile, a physical printer. |
 | Deformation | Axial warp plus two-station radial scale. | Anisotropy, distal roundness, PCA scores. |
-| Socket | One offset shell. `modify_socket_geometry` for wall and rim. | Variable thickness, rectification. |
-| Print | `tt_draft_028`, one virtual start, a live step view, and chat answers from the printer read-back. | A second profile, a physical printer. |
+| Socket geometry | One offset shell. `modify_socket_geometry` for wall and rim. | Variable thickness, rectification. |
 | Model | Nemotron tool loop on vLLM. | MCP, NeMo Gym. |
 
 Do not simulate the tool trace, the measurement check, or the printer read-back. The stand-in shell in section 8 is allowed only after the offset experiment fails, and it must be labeled.

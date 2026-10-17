@@ -44,6 +44,10 @@ REFERENCE_DIR = REPO_ROOT / "data" / "reference"
 REFERENCE_STEP = REFERENCE_DIR / "standardized_limb.step"
 REFERENCE_STL = REFERENCE_DIR / "standardized_limb.stl"
 REFERENCE_REPORT = REFERENCE_DIR / "standardized_limb_validation.json"
+SOCKET_PROFILE_PATH = REPO_ROOT / "data" / "profiles" / "standard_socket.json"
+SOCKET_STEP = REFERENCE_DIR / "standardized_socket.step"
+SOCKET_STL = REFERENCE_DIR / "standardized_socket.stl"
+SOCKET_REPORT = REFERENCE_DIR / "standardized_socket_report.json"
 
 # Future tool names, not registered with the agent yet:
 # inspect_cad, measure_section, update_measurement_profile, propose_modification,
@@ -439,7 +443,12 @@ def _reject_reference(path: Path, *, overwrite_reference: bool) -> None:
     if overwrite_reference:
         return
     resolved = path.resolve()
-    protected = {REFERENCE_STEP.resolve(), REFERENCE_STL.resolve()}
+    protected = {
+        REFERENCE_STEP.resolve(),
+        REFERENCE_STL.resolve(),
+        SOCKET_STEP.resolve(),
+        SOCKET_STL.resolve(),
+    }
     if resolved in protected:
         raise ValueError(f"Refusing to overwrite the reference model at {path}")
 

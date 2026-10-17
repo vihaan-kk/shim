@@ -24,6 +24,10 @@ from tools.cad.generate_limb import (
     REFERENCE_REPORT,
     REFERENCE_STEP,
     REFERENCE_STL,
+    SOCKET_PROFILE_PATH,
+    SOCKET_REPORT,
+    SOCKET_STEP,
+    SOCKET_STL,
     export_solid,
     generate_limb,
     load_profile,
@@ -99,6 +103,10 @@ def _protected(path: Path) -> bool:
         REFERENCE_REPORT.resolve(),
         REFERENCE_DIR.resolve(),
         PROFILE_PATH.parent.resolve(),
+        SOCKET_PROFILE_PATH.resolve(),
+        SOCKET_STEP.resolve(),
+        SOCKET_STL.resolve(),
+        SOCKET_REPORT.resolve(),
     }
     return resolved in blocked
 

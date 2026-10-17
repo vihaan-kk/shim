@@ -6,6 +6,8 @@ import pytest
 
 from tools.cad.generate_limb import PROFILE_PATH, REFERENCE_STEP, load_profile
 from tools.cad.measure_limb import load_step_shape, measure_shape
+from tools.cad.generate_socket import generate_socket, load_socket_profile, with_derived
+from tools.cad.measure_socket import measure_socket
 from tools.cad.modify_limb import modify_limb
 
 
@@ -42,3 +44,26 @@ def plus_five(tmp_path_factory, standard_model):
     )
     result["original_bytes"] = before
     return result
+
+
+@pytest.fixture(scope="session")
+def standard_socket(standard_model):
+    """One hollow socket built from the standard profiles."""
+    import copy
+
+    from tools.cad.generate_socket import limb_geometry_hash
+
+    limb = standard_model["profile"]
+    profile = copy.deepcopy(load_socket_profile())
+    stored = profile.get("reference_limb_geometry_hash")
+    if not isinstance(stored, str) or len(stored) != 64:
+        profile["reference_limb_geometry_hash"] = limb_geometry_hash(standard_model["shape"], limb)
+    profile = with_derived(limb, profile)
+    shape = generate_socket(limb, profile)
+    measured = measure_socket(shape, profile, limb)
+    return {
+        "limb": limb,
+        "profile": profile,
+        "shape": shape,
+        "measured": measured,
+    }

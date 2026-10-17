@@ -142,7 +142,7 @@ Default comparison tolerances are 1 mm (circumference), 0.05 mm (length), 1000 m
 - The 6 mm cap blend is an absolute length. A very short total length, such as 20 mm, overlaps the previous station and is rejected.
 - The in-memory kernel bounding box can extend past the trimmed tip. Length checks use cutting planes. After STEP reimport the box ends on the tip.
 - The proximal end is a closed planar ellipse, not an open skin surface.
-- These tools do not build a socket, call a printer, or talk to Nemotron.
+- Socket generation is a separate solid. See `SOCKET_CAD_DESIGN.md`. Comparing a limb with a socket is a separate step. See `LIMB_SOCKET_INTEGRATION.md`. These limb tools do not call a printer or Nemotron.
 
 ## Example
 

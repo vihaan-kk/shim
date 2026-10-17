@@ -3,11 +3,12 @@
 import os
 import re
 import secrets
+import shutil
 import subprocess
 from pathlib import Path
 
 from common import confirmations
-from common.result import fatal, fixable, success
+from common.result import SUCCESS, fatal, fixable, success
 from tools.printer.octoprint_client import OctoPrintClient, OctoPrintError
 from tools.registry import tool
 
@@ -87,7 +88,8 @@ PROFILES = ["draft_028", "demo_020"]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = Path(os.environ.get("WORKSPACE_DIR", REPO_ROOT / "workspace"))
 PROFILE_DIR = Path(__file__).resolve().parent / "profiles"
-SLICER_BIN = os.environ.get("PRUSASLICER_BIN", "prusa-slicer")
+MACOS_SLICER = "/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"
+SLICER_BIN = os.environ.get("PRUSASLICER_BIN") or shutil.which("prusa-slicer") or MACOS_SLICER
 
 # Job ledger: what this process has sliced and sent. Printer state is always
 # read back from OctoPrint; the ledger only stops a second start.
@@ -181,10 +183,19 @@ def slice_revision(revision_id: str, profile_id: str):
         )
     profile = PROFILE_DIR / f"{profile_id}.ini"
     if not profile.is_file():
+        installed = [p for p in PROFILES if (PROFILE_DIR / f"{p}.ini").is_file()]
+        if installed:
+            return fixable(
+                code="profile_missing",
+                reason=f"Profile {profile_id} is not installed.",
+                message="Use an installed profile.",
+                valid_range=installed,
+            )
         return fatal(
             code="profile_missing",
-            reason=f"Slicer profile file {profile.name} is not installed.",
-            message="Slicing is not set up on this machine. Tell the user.",
+            reason="No slicer profiles are installed, so no profile can be used.",
+            message="Slicing is not set up on this machine, so nothing can be sliced or printed. "
+                    "Tell the user this; do not offer another profile.",
         )
 
     job_id = "job_" + secrets.token_hex(3)
@@ -201,7 +212,7 @@ def slice_revision(revision_id: str, profile_id: str):
         return fatal(code="slicer_failed", reason=tail or f"slicer exited {proc.returncode}",
                      message="The slicer rejected this part. Tell the user; do not retry unchanged.")
 
-    stats = parse_gcode_stats(gcode.read_text(errors="replace")[-20000:])
+    stats = parse_gcode_stats(gcode.read_text(errors="replace")[-300000:])
     _jobs[job_id] = {"revision_id": revision_id, "profile_id": profile_id, "gcode": gcode, "state": "sliced"}
     est = stats["estimated_seconds"]
     return success(
@@ -396,4 +407,94 @@ def cancel_print(job_id: str):
         code="cancel_not_delivered",
         reason=f"Printer still reports {state!r} after cancel.",
         message="The cancel is not confirmed; the print may still be running. Tell the user.",
+    )
+
+
+# ---------------------------------------------------------------------------
+# prepare_print: find the part's file, slice if needed, stop before the print
+# ---------------------------------------------------------------------------
+
+
+def _printable_revisions() -> list:
+    """Revisions that have an exported part and passed validation."""
+    root = WORKSPACE / "revisions"
+    if not root.is_dir():
+        return []
+    return sorted(
+        d.name for d in root.iterdir() if (d / "part.stl").is_file() and (d / "validated").exists()
+    )
+
+
+def _reusable_job(revision_id: str, profile_id: str):
+    """A job already sliced from this revision and profile, with G-code newer than the part."""
+    stl = _revision_stl(revision_id)
+    for job_id, job in _jobs.items():
+        if (
+            job["revision_id"] == revision_id
+            and job["profile_id"] == profile_id
+            and job["state"] == "sliced"
+            and job["gcode"].is_file()
+            and job["gcode"].stat().st_mtime >= stl.stat().st_mtime
+        ):
+            return job_id, job
+    return None, None
+
+
+@tool(
+    name="prepare_print",
+    description=(
+        "Get a part ready to print: find its exported file, slice it if it has not "
+        "been sliced yet, and return a job_id with estimated time and filament. Use "
+        "this when the user asks to print a part. It does not start the print: next "
+        "call request_confirmation for start_print with the returned job_id, then "
+        "start_print. If revision_id is left out, the one validated part is used; "
+        "if several exist, ask the user which."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "revision_id": {"type": "string", "description": "Part revision to print. Optional if only one is ready."},
+            "profile_id": {
+                "type": "string",
+                "enum": PROFILES,
+                "description": "draft_028 is faster; demo_020 is finer. Ask the user; do not choose for them.",
+            },
+        },
+        "required": ["profile_id"],
+    },
+)
+def prepare_print(profile_id: str, revision_id: str = ""):
+    ready = _printable_revisions()
+    if not revision_id:
+        if not ready:
+            return fixable(
+                code="no_printable_part",
+                reason="No exported, validated part was found.",
+                message="There is nothing ready to print. Tell the user a part must be created, "
+                        "validated and exported first.",
+            )
+        if len(ready) > 1:
+            return fixable(
+                code="ambiguous_part",
+                reason="More than one part is ready to print.",
+                message="Ask the user which revision to print.",
+                valid_range=ready,
+            )
+        revision_id = ready[0]
+
+    job_id, job = _reusable_job(revision_id, profile_id)
+    if job is not None:
+        return success(
+            f"Reusing the existing slice of {revision_id} ({profile_id}). "
+            "Next: request_confirmation for start_print with this job_id.",
+            {"job_id": job_id, "revision_id": revision_id, "profile_id": profile_id, "reused": True},
+        )
+
+    sliced = slice_revision(revision_id, profile_id)
+    if sliced.status != SUCCESS:
+        return sliced
+    sliced.data["reused"] = False
+    return success(
+        sliced.message + " Next: request_confirmation for start_print with this job_id.",
+        sliced.data,
     )

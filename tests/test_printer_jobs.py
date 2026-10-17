@@ -95,7 +95,12 @@ def test_slice_refuses_unvalidated_and_unknown(env, tmp_path):
 
 def test_slice_missing_profile_and_slicer(env, tmp_path, monkeypatch):
     (tmp_path / "profiles" / "draft_028.ini").unlink()
-    assert pt.slice_revision("r1", "draft_028").error.code == "profile_missing"
+    one = pt.slice_revision("r1", "draft_028")  # only demo_020 is left
+    assert one.status == "fixable" and one.error.valid_range == ["demo_020"]
+    (tmp_path / "profiles" / "demo_020.ini").unlink()
+    none = pt.slice_revision("r1", "draft_028")  # nothing installed: not retryable
+    assert none.status == "fatal" and none.error.code == "profile_missing"
+    (tmp_path / "profiles" / "demo_020.ini").write_text("")
 
     def boom(*a):
         raise FileNotFoundError
@@ -167,3 +172,58 @@ def test_cancel_unconfirmed(env):
     pt.start_print(job, confirmations.create("start_print", job, "p"))
     env.cancel_job = lambda: None  # printer ignores it, still Printing
     assert pt.cancel_print(job).error.code == "cancel_not_delivered"
+
+
+# ----- prepare_print -----
+
+def add_revision(tmp_path, name, validated=True):
+    d = tmp_path / "revisions" / name
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "part.stl").write_text("solid")
+    if validated:
+        (d / "validated").write_text("")
+
+
+def test_prepare_uses_only_ready_part_and_slices(env):
+    r = pt.prepare_print("draft_028")
+    assert r.ok and r.data["reused"] is False and r.data["job_id"] in pt._jobs
+    assert "request_confirmation" in r.message
+
+
+def test_prepare_reuses_existing_slice(env):
+    first = pt.prepare_print("draft_028", "r1")
+    again = pt.prepare_print("draft_028", "r1")
+    assert again.data["reused"] is True and again.data["job_id"] == first.data["job_id"]
+    other_profile = pt.prepare_print("demo_020", "r1")
+    assert other_profile.data["reused"] is False
+
+
+def test_prepare_reslices_when_part_changed(env, tmp_path):
+    import os
+    first = pt.prepare_print("draft_028", "r1")
+    stl = tmp_path / "revisions" / "r1" / "part.stl"
+    os.utime(stl, (stl.stat().st_atime, pt._jobs[first.data["job_id"]]["gcode"].stat().st_mtime + 10))
+    assert pt.prepare_print("draft_028", "r1").data["reused"] is False
+
+
+def test_prepare_ambiguous_lists_options(env, tmp_path):
+    add_revision(tmp_path, "r2")
+    r = pt.prepare_print("draft_028")
+    assert r.error.code == "ambiguous_part" and r.error.valid_range == ["r1", "r2"]
+
+
+def test_prepare_nothing_ready(env, tmp_path):
+    (tmp_path / "revisions" / "r1" / "validated").unlink()
+    assert pt.prepare_print("draft_028").error.code == "no_printable_part"
+
+
+def test_prepare_passes_slice_errors_through(env, tmp_path):
+    add_revision(tmp_path, "r3", validated=False)
+    assert pt.prepare_print("draft_028", "r3").error.code == "not_validated"
+    assert pt.prepare_print("draft_028", "nope").error.code == "unknown_revision"
+
+
+def test_prepare_then_start_needs_confirmation(env):
+    job = pt.prepare_print("draft_028").data["job_id"]
+    assert pt.start_print(job, "conf_x").error.code == "confirmation_invalid"
+    assert "upload" not in env.calls

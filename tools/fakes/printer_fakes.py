@@ -86,6 +86,39 @@ def slice_revision(revision_id: str, profile_id: str):
 
 
 @tool(
+    name="prepare_print",
+    description=(
+        "Get a part ready to print: find its exported file, slice it if it has not "
+        "been sliced yet, and return a job_id with estimated time and filament. Use "
+        "this when the user asks to print a part. It does not start the print: next "
+        "call request_confirmation for start_print with the returned job_id, then "
+        "start_print. If revision_id is left out, the one validated part is used; "
+        "if several exist, ask the user which."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "revision_id": {"type": "string", "description": "Part revision to print. Optional if only one is ready."},
+            "profile_id": {
+                "type": "string",
+                "enum": PROFILES,
+                "description": "draft_028 is faster; demo_020 is finer. Ask the user; do not choose for them.",
+            },
+        },
+        "required": ["profile_id"],
+    },
+)
+def prepare_print(profile_id: str, revision_id: str = "r1"):
+    for job_id, job in _jobs.items():
+        if job["revision_id"] == revision_id and job["state"] == "sliced":
+            return success(
+                f"Reusing the existing slice of {revision_id}. Next: request_confirmation for start_print.",
+                {"job_id": job_id, "revision_id": revision_id, "profile_id": profile_id, "reused": True},
+            )
+    return slice_revision(revision_id, profile_id)
+
+
+@tool(
     name="start_print",
     description=(
         "Upload a sliced job to the printer and start it. Requires a confirmation_id "

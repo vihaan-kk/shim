@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "agent/ui/web", "run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "web-real-api",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["NEXT_PUBLIC_USE_MOCK=0", "npm", "--prefix", "agent/ui/web", "run", "dev", "--", "--port", "3001"],
+      "port": 3001
+    }
+  ]
+}

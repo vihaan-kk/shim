@@ -1,0 +1,79 @@
+# Shim web workbench
+
+This is the three-page frontend from README §3 and §13:
+- **Residual limb** (`/`): the 3D limb, the measurement profile, the agent chat, and Confirm.
+- **Socket** (`/socket`): the socket shell, its geometric checks, the agent chat, and Confirm.
+- **Printer** (`/printer`): the job metadata, slice and print controls, the agent chat, and the report.
+
+The same agent conversation carries across all three pages.
+
+**Status:** scaffold. Every region runs on mock data shaped like the Python payloads. The real backend is specified in [`docs/FRONTEND_API.md`](../../../docs/FRONTEND_API.md) and is not built yet.
+
+## Run
+
+```bash
+cd agent/ui/web
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. The `predev` and `prebuild` scripts copy the reference meshes and reports from `data/reference/` into `public/mock/`, which is gitignored.
+
+### Demo flow (mock)
+
+1. **Limb.** Type in the profile, or tell the agent "change the proximal circumference to 310 mm". Fill length, P and D, then press **Confirm limb**.
+2. **Socket.** Optionally tell the agent "make the wall 6 mm", then press **Confirm socket**.
+3. **Printer.** Tell the agent "slice and print the socket", answer `draft_028`, and approve in the dialog. Ask "how is the print going?", then press **Demo: simulate link loss**.
+
+The mock keeps its state until you reload the page.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NEXT_PUBLIC_USE_MOCK` | `1` | Set `0` to use the real HTTP API |
+| `NEXT_PUBLIC_API_BASE` | `http://localhost:8001/api` | Base URL of the Python API |
+
+To run against the real API, start the `web-real-api` entry in the repo's `.claude/launch.json`, or run `NEXT_PUBLIC_USE_MOCK=0 npm run dev -- --port 3001`. The page loads its state from `GET /api/session` on every load.
+
+## Where things are
+
+| Path | What |
+|---|---|
+| `app/page.tsx`, `app/socket/page.tsx`, `app/printer/page.tsx` | The three pages |
+| `app/layout.tsx` | Fonts, the session provider, and the app shell. They live here so state survives navigation. |
+| `lib/session.tsx` | Session state: measurement document, limb and socket revisions, agent turns, confirmations, and printer polling |
+| `components/app-shell.tsx` | Top bar with the three steps. A step unlocks after the previous Confirm. Also holds the page heading, Confirm button, and global approval dialog. |
+| `components/measurement-profile.tsx` | Required and optional fields together, as README §5.4 specifies |
+| `components/agent-chat.tsx`, `chat-panel.tsx` | Agent chat with a collapsible tool-call trace |
+| `components/print-panel.tsx` | One highlighted step plus the OctoPrint fields (README §12). Missing fields say "not reported". |
+| `components/print-controls.tsx` | Slice and print actions, and the confirmation dialog |
+| `components/stl-viewer.tsx`, `validation-list.tsx`, `header-dots.tsx` | The three.js viewer, the geometric checks, and the header dot field |
+| `lib/types.ts`, `lib/api.ts`, `lib/mock/mock-api.ts` | Types that mirror Python, the API interface plus the HTTP client, and the mock |
+
+## Design
+
+The look follows the v0 template "Optimus" by kerroudj. Tokens are in `app/globals.css` and fonts in `app/layout.tsx`.
+- **Fonts:** Instrument Sans, with JetBrains Mono for labels.
+- **Colors:** a warm off-white `#fafaf9` background and ink `#080503`.
+- **Shapes:** pill buttons, 4 px corners, and large tight-tracked headings (`.display-1` and `.display-2`).
+- **Animation:** one dot-field canvas in the header only. It stays static under `prefers-reduced-motion`.
+
+The UI components are shadcn/ui in the `base-nova` style, which is built on Base UI rather than Radix. Use the `render` prop instead of `asChild`.
+
+## Rules the page keeps
+
+- The browser never computes geometry and never sends file paths. It sends ids and displays what tools return.
+- The limb and the socket are never drawn as one object. Each has its own page and title.
+- Limb Confirm stays disabled while length, P or D is empty. Socket Confirm stays disabled unless the geometric checks pass.
+- "Approve print" is enabled only when three things hold: the printer is ready, a job is sliced, and the agent has asked for a `start_print` confirmation.
+- When the link drops, the panel keeps the last good read and labels it "Link lost". Time left shows "unknown", and no percentage is invented.
+- "Simulate link loss" exists in mock mode only. Fault injection is never something the model can call.
+
+## Notes
+
+- Next.js 16: read `AGENTS.md` first. Next 16 keeps the previous page mounted but hidden (React Activity) for fast back navigation. That is why the DOM can hold more than one chat box. Only the visible one is live.
+- The 3D viewers size themselves on animation frames. In a hidden or background tab they stay at the default canvas size until the tab is shown.
+
+## Next steps for the owner
+
+1. Build the API in `docs/FRONTEND_API.md`, then run with `NEXT_PUBLIC_USE_MOCK=0`.
+2. Resolve the open dependencies at the end of that file. They cover CAD tool registration, naming, STL export and slice confirmation, and belong to Person 1 and Person 2.

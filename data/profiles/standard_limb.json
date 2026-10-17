@@ -1,0 +1,95 @@
+{
+  "model_id": "synthetic-transtibial-standard",
+  "model_version": "1.0.0",
+  "description": "Fully synthetic closed transtibial residual-limb solid for nonclinical software demonstration. Not a reconstruction of a person's anatomy, and not for fitting, wear, or clinical use.",
+  "clinical_use": false,
+  "units": "mm",
+  "coordinate_frame": {
+    "longitudinal_axis": "Z",
+    "ml_axis": "X",
+    "ap_axis": "Y",
+    "proximal_plane_z_mm": 0,
+    "distal_direction": "+Z",
+    "origin": "On the longitudinal axis, in the proximal plane"
+  },
+  "total_length_mm": 140,
+  "section_position_convention": "length_fraction",
+  "section_position_note": "Cross-section positions are fractions of total length. z_mm = length_fraction * total_length_mm. A length change keeps those fractions and the circumference values, then recomputes z_mm and the distal cap. Circumferences stay in millimetres.",
+  "cross_section": {
+    "type": "ellipse",
+    "aspect_ratio_name": "ap_over_ml",
+    "aspect_ratio_definition": "Anterior-posterior axis length divided by medial-lateral axis length. This equals the Y semi-axis divided by the X semi-axis. Every station uses the same value so the solid can be a revolution scaled along Y.",
+    "circumference_definition": "Perimeter of the ellipse from the complete elliptic integral. Semi-axes are solved so that perimeter equals the target. Circumference is not treated as pi times a diameter."
+  },
+  "sections": [
+    {
+      "id": "proximal",
+      "name": "Proximal reference",
+      "z_mm": 0,
+      "length_fraction": 0,
+      "circumference_mm": 300,
+      "ap_over_ml": 0.85
+    },
+    {
+      "id": "q25",
+      "name": "25% of length",
+      "z_mm": 35,
+      "length_fraction": 0.25,
+      "circumference_mm": 290,
+      "ap_over_ml": 0.85
+    },
+    {
+      "id": "q50",
+      "name": "50% of length",
+      "z_mm": 70,
+      "length_fraction": 0.5,
+      "circumference_mm": 275,
+      "ap_over_ml": 0.85
+    },
+    {
+      "id": "q75",
+      "name": "75% of length",
+      "z_mm": 105,
+      "length_fraction": 0.75,
+      "circumference_mm": 255,
+      "ap_over_ml": 0.85
+    },
+    {
+      "id": "distal_reference",
+      "name": "Distal circumference before the cap",
+      "z_mm": 126,
+      "length_fraction": 0.9,
+      "circumference_mm": 235,
+      "ap_over_ml": 0.85
+    }
+  ],
+  "distal_cap": {
+    "type": "ellipsoidal",
+    "reference_section_id": "distal_reference",
+    "start_z_mm": 126,
+    "tip_z_mm": 140,
+    "length_mm": 14,
+    "profile": "Quarter ellipse in the ML-Z plane, from the distal reference semi-axis to a point on the axis. A rounded tip has no nonzero planar circumference. The 235 mm target is the cross-section at z = 126 mm, and the cap occupies the remaining 14 mm."
+  },
+  "proximal_termination": {
+    "type": "planar_elliptical_cap",
+    "z_mm": 0,
+    "note": "The proximal end is closed by the planar ellipse at z = 0 so the result is one watertight solid. This is a synthetic termination, not an open anatomical trim."
+  },
+  "interpolation": {
+    "radius_profile": "Monotone cubic (PCHIP) of the medial-lateral semi-axis versus z through the five stations. Over the last 6 mm before the cap, a cubic Hermite blend matches that curve and then meets the cap with zero slope.",
+    "profile_sample_step_mm": 1,
+    "cap_tangent_blend_mm": 6
+  },
+  "construction": {
+    "method": "revolution_then_y_scale",
+    "kernel": "CadQuery/OpenCascade",
+    "note": "A ThruSections loft that ended on a tip vertex stayed valid but left the station planes. Revolving the medial-lateral profile, including the cap, then scaling Y by ap_over_ml keeps the stations and closes the tip. Every station must share one ap_over_ml."
+  },
+  "tolerances": {
+    "circumference_mm": 1,
+    "length_mm": 0.05,
+    "circumference_rationale": "1 mm is the acceptance limit for this demonstration. It is about 0.3 to 0.4 percent of these perimeters (235 to 300 mm). The inputs are exact numbers, so the check is tighter than physical tape error on purpose. It still leaves room for kernel tolerance while rejecting a section that missed its target.",
+    "length_rationale": "The proximal face is constructed at z = 0 and the tip point at z = 140. Acceptance uses cutting planes. A non-uniform scale can leave surface poles outside the trimmed solid, so the kernel box is recorded but not used as the check. The last plane that still cuts a curve sits just short of the point tip. 0.05 mm covers that gap."
+  }
+}

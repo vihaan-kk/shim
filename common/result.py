@@ -1,44 +1,101 @@
-"""Shared tool result envelope (README section 8.2)."""
-from __future__ import annotations
+"""The result shape every tool returns.
+
+Every tool, real or fake, returns a ToolResult built with one of three
+factory functions:
+
+    success(message, data)          the call worked
+    fixable(code, reason, message)  the arguments were wrong; correct and retry
+    fatal(code, reason, message)    retrying will not help; tell the user
+
+to_dict() gives the JSON the model sees:
+
+    {
+      "status": "success" | "fixable" | "fatal",
+      "data": {...},
+      "message": "short summary for the model",
+      "error": {"code": ..., "reason": ..., "valid_range" | "hint": ...} or None,
+      "retryable": bool
+    }
+"""
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 SUCCESS = "success"
 FIXABLE = "fixable"
 FATAL = "fatal"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ToolError:
     code: str
     reason: str
-    valid: Optional[Any] = None  # only for fixable errors: what would be accepted
+    valid_range: Any = None
+    hint: str | None = None
+
+    def to_dict(self) -> dict:
+        error = {"code": self.code, "reason": self.reason}
+        if self.valid_range is not None:
+            error["valid_range"] = self.valid_range
+        if self.hint is not None:
+            error["hint"] = self.hint
+        return error
 
 
-@dataclass
+@dataclass(frozen=True)
 class ToolResult:
     status: str
     message: str
     data: dict = field(default_factory=dict)
-    error: Optional[ToolError] = None
+    error: ToolError | None = None
+    retryable: bool = False
+
+    @property
+    def ok(self) -> bool:
+        return self.status == SUCCESS
 
     def to_dict(self) -> dict:
-        err = None
-        if self.error is not None:
-            err = {"code": self.error.code, "reason": self.error.reason}
-            if self.error.valid is not None:
-                err["valid"] = self.error.valid
-        return {"status": self.status, "message": self.message, "data": self.data, "error": err}
+        return {
+            "status": self.status,
+            "data": self.data,
+            "message": self.message,
+            "error": self.error.to_dict() if self.error else None,
+            "retryable": self.retryable,
+        }
 
 
-def success(message: str, **data: Any) -> ToolResult:
-    return ToolResult(SUCCESS, message, dict(data))
+def success(message: str, data: dict | None = None) -> ToolResult:
+    return ToolResult(status=SUCCESS, message=message, data=data or {})
 
 
-def fixable(code: str, reason: str, valid: Any = None, message: str = "") -> ToolResult:
-    return ToolResult(FIXABLE, message or reason, {}, ToolError(code, reason, valid))
+def fixable(
+    code: str,
+    reason: str,
+    message: str,
+    valid_range: Any = None,
+    hint: str | None = None,
+    data: dict | None = None,
+) -> ToolResult:
+    return ToolResult(
+        status=FIXABLE,
+        message=message,
+        data=data or {},
+        error=ToolError(code=code, reason=reason, valid_range=valid_range, hint=hint),
+        retryable=True,
+    )
 
 
-def fatal(code: str, reason: str, message: str = "") -> ToolResult:
-    return ToolResult(FATAL, message or reason, {}, ToolError(code, reason))
+def fatal(
+    code: str,
+    reason: str,
+    message: str,
+    hint: str | None = None,
+    data: dict | None = None,
+) -> ToolResult:
+    return ToolResult(
+        status=FATAL,
+        message=message,
+        data=data or {},
+        error=ToolError(code=code, reason=reason, hint=hint),
+        retryable=False,
+    )

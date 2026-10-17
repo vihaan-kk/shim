@@ -1,6 +1,6 @@
 # Transtibial Prosthetic Socket Agent
 
-An SLM-powered agent that customizes a synthetic below-knee residual limb from a short questionnaire, builds a separate demonstration socket shell, and prepares that shell for a confirmed virtual 3D print.
+An SLM-powered agent that customizes a synthetic below-knee residual limb from a short questionnaire, builds a separate demonstration socket shell, starts a confirmed virtual 3D print, and watches that print until it finishes.
 
 The model does not deform meshes or operate the printer. It chooses a tool and fills in structured arguments. Deterministic Python code checks those arguments, edits geometry, validates the result, and returns a typed result. The agent asks when a measurement is missing or inconsistent, keeps earlier confirmed values, and never starts a print without a separate human confirmation.
 
@@ -51,7 +51,7 @@ This agent is that demonstration path, for transtibial geometry only:
 3. The model calls deterministic tools that copy the template, deform it, and write a new residual-limb STL.
 4. They can correct a number or ask for a supported shape change in ordinary language. Each accepted change writes another limb revision and leaves other confirmed measurements unchanged.
 5. The model then calls a separate CAD tool that builds a demonstration socket shell around the current limb revision. The limb STL is preserved.
-6. After geometric validation, slicing, and an explicit confirmation, the agent starts a virtual print and writes a fabrication report.
+6. After geometric validation, slicing, and an explicit confirmation, the agent starts a virtual print. A monitor shows the current step and the latest OctoPrint fields. The practitioner can ask how the print is going, and the answer comes from that read-back. The agent then writes a fabrication report.
 
 Four stages stay separate.
 
@@ -60,7 +60,7 @@ Four stages stay separate.
 | Residual-limb geometry | What reference surface are we demonstrating? | Scale and gently reshape a synthetic transtibial template from a few measurements. Output is a limb STL. |
 | Socket geometry | What closed shell surrounds that reference? | Constant clearance, constant wall, a planar proximal opening, a rounded rim. Output is a different STL. |
 | Socket rectification | Where should a wearable socket load or unload tissue? | Out of scope. No patellar-tendon bar, no relief map, no pressure prediction. |
-| Manufacturability | Can this shell be sliced on the configured virtual printer? | Closure, wall, self-intersection, build volume, overhangs, then a confirmed virtual job. |
+| Manufacturability | Can this shell be sliced on the configured virtual printer? | Closure, wall, self-intersection, build volume, overhangs, a confirmed virtual job, then a live view of that job. |
 
 ## 2. Scope and Nonclinical Demonstration Boundary
 
@@ -72,6 +72,7 @@ In scope:
 - A questionnaire the practitioner answers directly: residual length and two circumferences.
 - Conversational corrections that update one parameter.
 - A constant-offset demonstration shell, mesh checks, one slicing profile, and a gated virtual print.
+- A live monitor of that virtual print: the current step, job metadata from the OctoPrint API, and chat answers that quote the same read-back.
 - An audit report that cites OpenLimbTT and states the nonclinical limit.
 
 Outside this prototype:
@@ -97,7 +98,8 @@ A tape measurement is something a trained practitioner can take at the point of 
 5. A comparison view shows the previous and current limb revisions with measured differences.
 6. "Generate a demonstration socket" produces a second STL. The socket viewer is a separate panel.
 7. Validation cards report mesh checks. They are labeled geometric checks.
-8. The practitioner approves the single print profile, then confirms the virtual print on a different button. Progress comes from the printer read-back.
+8. The practitioner approves the single print profile, then confirms the virtual print on a different button.
+9. The print monitor shows the current step and the latest OctoPrint fields. The same chat stays open. "How is the print going?" is answered from a fresh printer read, and those numbers are the ones on the monitor.
 
 The page never overlays the limb and the socket as if they were one object. Titles stay "Residual limb" and "Socket shell."
 
@@ -430,10 +432,12 @@ Browser
   measurement form, chat
   limb viewer, comparison, socket viewer
   validation cards, two confirmation buttons
+  print monitor (step, progress, OctoPrint fields)
         |
         v
 Python agent
   measurement document, phase filter, confirmation store, audit log
+  printer poll while a job is active
         |
         +-- Nemotron 3.5 Lightning through Red Hat vLLM
         |
@@ -517,7 +521,7 @@ A failed limb edit stays on the previous `limb_current`. A lost printer link mov
 | `socket_current` | `modify_socket_geometry`, `validate_socket_geometry`, `export_socket_stl` |
 | `socket_validated` | `list_print_profiles`, `request_confirmation` for slice, then `slice_model` |
 | `sliced`, printer ready, unused print confirmation | `get_printer_status`, `check_printer_readiness`, `start_print` |
-| `printing` or `unknown` | `get_printer_status`, `reconcile_printer_state`, `request_safe_pause` |
+| `printing` or `unknown` | `get_printer_status`, `reconcile_printer_state`, `request_safe_pause`. A question about the print is answered only after `get_printer_status`. |
 
 `start_print` is omitted while the phase is `unknown`.
 
@@ -958,7 +962,7 @@ Library: PrusaSlicer CLI `--export-gcode`. Time and filament are parsed from its
 
 #### `get_printer_status`
 
-Read connection, printer, and job. **Straightforward.** This does not decide whether a start is allowed.
+Read connection, printer, and job. **Straightforward.** This does not decide whether a start is allowed. During a print it is also the only source for a chat answer about progress.
 
 Inputs: none.
 
@@ -968,11 +972,11 @@ Inputs: none.
 
 Example: `{"name": "get_printer_status", "arguments": {}}`
 
-Output: `{connection, printer, job}` summaries from the three GET endpoints.
+Output: one snapshot `{observed_at, step, connection, printer, job}`. `step` is the display step derived in section 12. The other three objects are the fields listed there, not a retelling by the model.
 
-Errors: `printer_unreachable`.
+Errors: `printer_unreachable`. The last good snapshot stays on screen and is marked stale.
 
-Library: OctoPrint REST.
+Library: OctoPrint REST, `GET /api/connection`, `GET /api/printer`, and `GET /api/job`. Permission `STATUS` only.
 
 #### `check_printer_readiness`
 
@@ -1119,7 +1123,8 @@ customized limb STL
   → slice_model
   → print confirmation
   → start_print
-  → get_printer_status
+  → poll the job and show the current step
+  → answer "how is the print going?" from that poll
   → reconcile or request_safe_pause
   → fabrication report
 ```
@@ -1131,13 +1136,45 @@ customized limb STL
 | Printer | [OctoPrint](https://docs.octoprint.org/en/main/api/) [Virtual Printer](https://docs.octoprint.org/en/main/development/virtual_printer.html) only. |
 | Start sequence | Upload, select with `print: false`, POST start, then `GET /api/job`. |
 | HTTP | 204 with an empty body means accepted. 409 means the state refused the command. Neither proves the job is printing. |
-| Progress | `get_printer_status` quotes completion and state from `GET /api/job`. |
+| Progress | The page polls the three GET endpoints. Chat quotes the same snapshot. |
 | Ledger | Every start and pause is stored by `job_id`. A second start is refused while the first is `sent`, `verified_printing`, or `unknown`. |
 | API key | `STATUS`, `FILES_UPLOAD`, `FILES_SELECT`, and `PRINT`. No `CONTROL`, so the model cannot send arbitrary G-code, jog, or set temperatures. |
 | Fault injector | `!!DEBUG:action_disconnect` uses a separate key. It is not an agent tool. |
 | Report | Dataset citation, template hash, measurement document, revision ids, certificate, profile, time, filament, printer observations, nonclinical statement. Written from the log. |
 
 A physical serial port fails `check_printer_readiness`. Firmware limits stay in firmware. This software does not disable them, and the virtual printer does not test them.
+
+### Print monitoring
+
+**Proposed.** After a verified start, the server polls OctoPrint about every 2 seconds while the phase is `printing`, `paused`, or `unknown`. The browser paints that snapshot. The model is not in the poll loop. A status question in chat calls `get_printer_status` once and answers from the returned snapshot, including its `observed_at`, so the sentence and the panel cannot disagree.
+
+The poll uses the three read endpoints already required for readiness. It does not send a job command, a temperature command, or G-code. The API key stays `STATUS`, `FILES_UPLOAD`, `FILES_SELECT`, and `PRINT`.
+
+The current step is one label, chosen from printer flags first and from `job.state` when the flags are absent:
+
+| Step | OctoPrint signal |
+|---|---|
+| Starting | Start was accepted, and `flags.printing` is still false. |
+| Printing | `flags.printing` is true, and pausing and cancelling are false. |
+| Pausing | `flags.pausing`, or `state` text `Pausing`. |
+| Paused | `flags.paused`, or `state` text `Paused`. |
+| Error | `flags.error`, `flags.closedOrError`, or a state such as `Error` or `Offline after error`. The documented state list is not exhaustive. |
+| Link lost | The poll failed. The phase moves to `unknown`. |
+| Finished | The ledger has `verified_printing` for this job, printing flags are now false, and no error flag is set. |
+
+The panel highlights that one step. A completion bar uses `progress.completion` beside the file position. Pausing, error, and link loss replace the bar's caption. They do not invent a percentage.
+
+Fields shown, from the [job](https://docs.octoprint.org/en/main/api/job.html), [printer](https://docs.octoprint.org/en/main/api/printer.html), [connection](https://docs.octoprint.org/en/main/api/connection.html), and [data model](https://docs.octoprint.org/en/main/api/datamodel.html) documents:
+
+| Source | Fields | What the panel does with them |
+|---|---|---|
+| `GET /api/job` | `state`; `error` when set; `job.file.name`, `origin`, `size`; `job.estimatedPrintTime`; `job.filament` length (mm) and volume (cm³); `progress.completion`, `filepos`, `printTime`, `printTimeLeft`, `printTimeLeftOrigin` | Step, file, percent, bytes printed, elapsed time, and time left. |
+| `GET /api/printer` | `state.text`; `state.flags` (`operational`, `printing`, `pausing`, `paused`, `cancelling`, `error`, `ready`, `closedOrError`); `temperature.tool0` and `bed` `actual` and `target` when present | Step selection. Temperatures are labeled as virtual-printer reports. |
+| `GET /api/connection` | `current.state`, `current.port`, `current.baudrate`, `current.printerProfile` | Port must stay `VIRTUAL`. Any other port is shown as a fault, not as a running job. |
+
+`printTimeLeft` is often missing at the start of a job. The panel and the chat both say the estimate is not available yet. `progress.completion` is documented as a percentage, while the job-API example is a fraction near 0.23. **Unresolved:** confirm that scale on this Virtual Printer before the page multiplies or divides it. Until then the page prints the number OctoPrint returned.
+
+A chat answer may state the step, completion, elapsed time, time left when present, file name, and whether the port is still virtual. It may not claim the socket is printed because a start returned 204. A status question does not pause, cancel, or start another job.
 
 ## 13. Frontend Architecture
 
@@ -1153,7 +1190,9 @@ One page. No CAD editor.
 | Socket viewer | Title "Socket shell." Separate component, separate URL, `role: socket_shell`. |
 | Validation | Certificate checks, each named as a geometric check. |
 | Print bar | Slice confirmation and print confirmation are different buttons. Print stays disabled until readiness is true and a slice exists. |
-| Report | Download at the end. |
+| Print monitor | Appears after a verified start. Shows the current step, completion, time, file, filament estimate, virtual port, and temperatures when OctoPrint reports them. Updates from the server poll, including while the chat is idle. |
+| Chat during print | Stays on the same page. A progress question is sent to the agent, which calls `get_printer_status` and quotes that snapshot. |
+| Report | Download at the end. It includes the last observed step. |
 
 The browser displays STL URLs. It does not recompute geometry. Proposed stack: a small Python app and [three.js](https://threejs.org/). The measurement document and the phase live on the server.
 
@@ -1177,8 +1216,10 @@ Target length 4–6 minutes for the happy path. One recovery can be live. The ot
 12. The user approves `tt_draft_028`.
 13. `slice_model` reports time and filament.
 14. The user presses the print confirmation.
-15. `start_print` then `get_printer_status`.
-16. The report is saved.
+15. `start_print`, then the monitor polls until `get_printer_status` shows the Printing step.
+16. The user asks "How is the print going?" The agent calls `get_printer_status` and answers with the step, completion, and time left from that snapshot.
+17. When the ledger has `verified_printing` and the printer is operational again with no error flag, the step changes to Finished.
+18. The report is saved, including that last step.
 
 Proximal correction:
 
@@ -1227,7 +1268,7 @@ Distal 360 mm with proximal 300 mm. `validate_measurements` returns `fixable` / 
 
 ### 14.4 Printer disconnect
 
-After a verified start, the injector sends `!!DEBUG:action_disconnect` with the injector key. The next `get_printer_status` fails. `reconcile_printer_state` returns `unknown`. `request_safe_pause` records `pause_not_delivered` if the pause cannot be read back. A second `start_print` is rejected from the ledger.
+After a verified start, the injector sends `!!DEBUG:action_disconnect` with the injector key. The next poll fails. The monitor keeps the last good snapshot, marks it stale, and the step becomes Link lost. `reconcile_printer_state` returns `unknown`. If the user asks how the print is going, the agent says the link is down and does not invent a percentage. `request_safe_pause` records `pause_not_delivered` if the pause cannot be read back. A second `start_print` is rejected from the ledger.
 
 ### 14.5 Distal shape, if that parameter is on
 
@@ -1241,7 +1282,7 @@ After a verified start, the injector sends `!!DEBUG:action_disconnect` with the 
 | Questionnaire | Length, P, D. | M, AP/ML, distal shape, side. |
 | Deformation | Axial warp plus two-station radial scale. | Anisotropy, distal roundness, PCA scores. |
 | Socket | One offset shell. `modify_socket_geometry` for wall and rim. | Variable thickness, rectification. |
-| Print | `tt_draft_028` and one virtual start. | A second profile, a physical printer. |
+| Print | `tt_draft_028`, one virtual start, a live step view, and chat answers from the printer read-back. | A second profile, a physical printer. |
 | Model | Nemotron tool loop on vLLM. | MCP, NeMo Gym. |
 
 Do not simulate the tool trace, the measurement check, or the printer read-back. The stand-in shell in section 8 is allowed only after the offset experiment fails, and it must be labeled.
@@ -1256,14 +1297,14 @@ Do not simulate the tool trace, the measurement check, or the printer read-back.
 |---|---|
 | 1 | vLLM flags, agent loop, measurement document, phase filter, confirmations, audit log. Starts against stub tools. |
 | 2 | Experiments 1–3, sidecars, limb deformation, socket shell, certificates. Critical path. |
-| 3 | The one INI, OctoPrint Virtual Printer, fault injection, the page, the report. A closed box can prove the printer gate before experiment 3 finishes. |
+| 3 | The one INI, OctoPrint Virtual Printer, the print monitor, fault injection, the page, the report. A closed box can prove the printer gate before experiment 3 finishes. |
 
 | When | Milestone |
 |---|---|
 | First hours | Experiment 1 done. Nemotron returns a tool call. Virtual printer answers `GET /api/job`. |
 | Next block | Experiment 2 done. Experiment 3 attempted. |
 | Evening | One limb revision on the page. One shell certified, or the stand-in decision written down. |
-| Night | Slice, both confirmations, verified virtual start. |
+| Night | Slice, both confirmations, verified virtual start, and one chat answer that matches the monitor. |
 | Following morning | The three failure cases have been run. README matches what ran. |
 
 **Do not cut:** the unit check, a real limb deformation or an honest coarse fallback, a real shell or the labeled stand-in, structured tool errors, the Nemotron loop, and the confirmation gate.
@@ -1324,5 +1365,6 @@ Further limits, after those three:
 - A locked-field bug in the agent is contained only if `validate_measurements` enforces `correction`. Prompt text is not the control.
 - The Red Hat vLLM image may lack the Nemotron parsers. Confirm that before writing the client against them.
 - The workflow resembles a fitting workflow. Questionnaire copy, tool descriptions, and the report have to keep saying "demonstration" and cite OpenLimbTT.
+- The Virtual Printer simulates progress. Time left can be missing, temperatures are not a physical machine, and `progress.completion` must be checked against the live response before the page treats it as 0–100. A chat reply that does not follow a fresh `get_printer_status` call is a wrong answer.
 
 The report sentence is fixed: the limb is a synthetic OpenLimbTT template adjusted to the entered measurements, the socket is a demonstration shell, and the print is virtual.

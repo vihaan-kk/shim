@@ -1,6 +1,6 @@
 # Transtibial Prosthetic Socket Agent
 
-An SLM-powered agent that customizes a synthetic below-knee residual limb from a short questionnaire, builds a separate demonstration socket shell, and prepares that shell for a confirmed virtual 3D print.
+An SLM-powered agent that customizes a synthetic below-knee residual limb from a short questionnaire, builds a separate demonstration socket shell, starts a confirmed virtual 3D print, and watches that print until it finishes.
 
 The model does not deform meshes or operate the printer. It chooses a tool and fills in structured arguments. Deterministic Python code checks those arguments, edits geometry, validates the result, and returns a typed result. The agent asks when a measurement is missing or inconsistent, keeps earlier confirmed values, and never starts a print without a separate human confirmation.
 
@@ -25,7 +25,7 @@ The innovation this prototype is built to show is the model's ability to coordin
 1. [Project Overview and Problem Statement](#1-project-overview-and-problem-statement)
 2. [Scope and Nonclinical Demonstration Boundary](#2-scope-and-nonclinical-demonstration-boundary)
 3. [Target User Experience](#3-target-user-experience)
-4. [OpenLimbTT Dataset and Standardized Templates](#4-openlimbtt-dataset-and-standardized-templates)
+4. [OpenLimbTT Dataset and the Standardized Shape](#4-openlimbtt-dataset-and-the-standardized-shape)
 5. [Practitioner Questionnaire and Measurement Schema](#5-practitioner-questionnaire-and-measurement-schema)
 6. [Residual-Limb STL Customization Algorithm](#6-residual-limb-stl-customization-algorithm)
 7. [Conversational Refinement and Version Control](#7-conversational-refinement-and-version-control)
@@ -46,12 +46,12 @@ Preparing even a demonstration below-knee socket means importing a shape, decidi
 
 This agent is that demonstration path, for transtibial geometry only:
 
-1. The practitioner selects a standardized OpenLimbTT residual-limb template.
-2. They enter geometric measurements they can collect with a tape, a ruler, and, optionally, calipers.
+1. The practitioner answers the questionnaire. Every session uses the same standardized transtibial shape, the OpenLimbTT mean skin, applied automatically.
+2. The questions ask for residual length, proximal circumference, and distal circumference, in millimetres.
 3. The model calls deterministic tools that copy the template, deform it, and write a new residual-limb STL.
 4. They can correct a number or ask for a supported shape change in ordinary language. Each accepted change writes another limb revision and leaves other confirmed measurements unchanged.
 5. The model then calls a separate CAD tool that builds a demonstration socket shell around the current limb revision. The limb STL is preserved.
-6. After geometric validation, slicing, and an explicit confirmation, the agent starts a virtual print and writes a fabrication report.
+6. After geometric validation, slicing, and an explicit confirmation, the agent starts a virtual print. A monitor shows the current step and the latest OctoPrint fields. The practitioner can ask how the print is going, and the answer comes from that read-back. The agent then writes a fabrication report.
 
 Four stages stay separate.
 
@@ -60,7 +60,7 @@ Four stages stay separate.
 | Residual-limb geometry | What reference surface are we demonstrating? | Scale and gently reshape a synthetic transtibial template from a few measurements. Output is a limb STL. |
 | Socket geometry | What closed shell surrounds that reference? | Constant clearance, constant wall, a planar proximal opening, a rounded rim. Output is a different STL. |
 | Socket rectification | Where should a wearable socket load or unload tissue? | Out of scope. No patellar-tendon bar, no relief map, no pressure prediction. |
-| Manufacturability | Can this shell be sliced on the configured virtual printer? | Closure, wall, self-intersection, build volume, overhangs, then a confirmed virtual job. |
+| Manufacturability | Can this shell be sliced on the configured virtual printer? | Closure, wall, self-intersection, build volume, overhangs, a confirmed virtual job, then a live view of that job. |
 
 ## 2. Scope and Nonclinical Demonstration Boundary
 
@@ -68,10 +68,11 @@ The prototype customizes synthetic transtibial residual limbs and generates belo
 
 In scope:
 
-- A library of three OpenLimbTT-derived skin templates, with two further transtibial shape variants as a stretch.
-- A questionnaire whose required items are residual length and two circumferences.
+- One standardized transtibial shape, OpenLimbTT `Mean-Skin.stl`, applied to every session.
+- A questionnaire the practitioner answers directly: residual length and two circumferences.
 - Conversational corrections that update one parameter.
 - A constant-offset demonstration shell, mesh checks, one slicing profile, and a gated virtual print.
+- A live monitor of that virtual print: the current step, job metadata from the OctoPrint API, and chat answers that quote the same read-back.
 - An audit report that cites OpenLimbTT and states the nonclinical limit.
 
 Outside this prototype:
@@ -90,18 +91,19 @@ A tape measurement is something a trained practitioner can take at the point of 
 
 **Session:**
 
-1. Template cards show the available transtibial shapes. The practitioner picks one.
-2. The questionnaire asks for length, proximal circumference, and distal circumference. Optional fields stay collapsed.
+1. The page opens on the questionnaire. The practitioner answers the questions. The mean transtibial skin is the shape behind every answer.
+2. The required questions are residual-limb length, proximal circumference, and distal circumference, each in millimetres. Optional questions stay collapsed. If a required answer is missing, the agent asks for that measurement by name.
 3. The limb viewer shows the customized residual-limb STL, labeled as the limb, not the socket.
 4. Chat and the form write the same measurement document. "Change the proximal circumference to 310 mm" updates that field only.
 5. A comparison view shows the previous and current limb revisions with measured differences.
 6. "Generate a demonstration socket" produces a second STL. The socket viewer is a separate panel.
 7. Validation cards report mesh checks. They are labeled geometric checks.
-8. The practitioner approves the single print profile, then confirms the virtual print on a different button. Progress comes from the printer read-back.
+8. The practitioner approves the single print profile, then confirms the virtual print on a different button.
+9. The print monitor shows the current step and the latest OctoPrint fields. The same chat stays open. "How is the print going?" is answered from a fresh printer read, and those numbers are the ones on the monitor.
 
 The page never overlays the limb and the socket as if they were one object. Titles stay "Residual limb" and "Socket shell."
 
-## 4. OpenLimbTT Dataset and Standardized Templates
+## 4. OpenLimbTT Dataset and the Standardized Shape
 
 ### 4.1 Verified dataset facts
 
@@ -109,7 +111,7 @@ Sources: the [OpenLimbTT paper](https://doi.org/10.1017/dce.2025.10019), the [re
 
 - Version `2025-07` is a statistical shape model trained on 33 transtibial limbs (4 female, 29 male). Training required amputation through the tibial diaphysis. The authors describe limited statistical generality.
 - Mode 1 is amputation height, about 52.2% of variance. Table 2 labels the high percentile long and the low percentile short.
-- Mode 2 is slender versus bulbous soft tissue, about 16.7% of variance. Table 2 labels the high percentile bulbous and the low percentile slender. The repository describes this axis as a bulbous-to-conical profile. "Conical" in the library below means the slender direction of mode 2, and only after the mesh is inspected.
+- Mode 2 is slender versus bulbous soft tissue, about 16.7% of variance. Table 2 labels the high percentile bulbous and the low percentile slender. Those mode files are not templates in this prototype.
 - About 69% of variance is in the first two modes, and about 95% is in the first ten. Later modes include bone scale, distal soft-tissue coverage, and knee flexion in the scans. Those are not questionnaire parameters.
 - Training limbs retained a median 36% of intact tibia length (range 18–60%).
 - Shapes are normalized by estimated intact tibia length, because residual length is not a stable fraction of the intact limb. The generation script suggests 378.52 mm as the training-set average and gives a range of 313.05–466.34 mm. **Unresolved:** which published STL, if either, is already in millimetres. STL has no unit field.
@@ -126,35 +128,23 @@ Binary STL size is `84 + 50 × triangles`. These published sizes divide evenly:
 | `Mean-Limb.stl` | 1,945,584 | 38,910 | Combined limb. Same byte size as every mode file below. |
 | `Mean-Limb-Full-Size.stl` | 1,945,584 | 38,910 | Combined limb, different SHA from `Mean-Limb.stl`. |
 | `Mean-Bones-Full-Size.stl` | 987,534 | 19,749 | Bones. Never a socket reference. |
-| `Mode1-20th-Mode2-Mean.stl` | 1,945,584 | 38,910 | Mode-combination file. Same class as the combined limb. |
-| `Mode1-80th-Mode2-Mean.stl` | 1,945,584 | 38,910 | Same. |
-| `Mode1-Mean-Mode2-20th.stl` | 1,945,584 | 38,910 | Same. |
-| `Mode1-Mean-Mode2-80th.stl` | 1,945,584 | 38,910 | Same. |
-| Four corner files, `Mode1-{20th,80th}-Mode2-{20th,80th}.stl` | 1,945,584 each | 38,910 each | Length and profile vary together. Not used as templates. |
+| `Mode1-*-Mode2-*.stl` (nine files) | 1,945,584 each | 38,910 each | Same class as the combined limb. Not loaded. |
 
-**Unresolved:** whether each mode file is one body or several. The byte size matches `Mean-Limb.stl`, which is strong evidence that bones are included. A mode file becomes a skin template only after a component split isolates one open skin surface.
+**Unresolved:** whether `Mean-Skin-Full-Size.stl` is a uniformly scaled copy of `Mean-Skin.stl`. Same triangle count is compatible with a scale and also with a re-export. The first experiment measures both bounding boxes and keeps one of them.
 
-**Unresolved:** whether `Mean-Skin-Full-Size.stl` is a uniformly scaled copy of `Mean-Skin.stl`. Same triangle count is compatible with a scale and also with a re-export. The first experiment measures both bounding boxes.
+### 4.2 The one template
 
-### 4.2 Recommended templates
+Every session deforms this one shape. The questionnaire supplies the measurements. The practitioner does not pick among shapes.
 
-Use files that change one mode at a time. Do not invent intermediate shapes, and do not treat a corner file as a pure short or pure conical limb.
+| ID | Shape | Published file |
+|---|---|---|
+| `tt_mean` | Mean transtibial skin | `version-2025-07/Mean-Skin.stl` |
 
-| ID | Intended demonstration shape | Published file | MVP |
-|---|---|---|---|
-| `tt_mean` | Average transtibial skin | `version-2025-07/Mean-Skin.stl` | Required. The demo runs on this file alone. |
-| `tt_short` | Shorter residual limb, mean soft-tissue profile | `version-2025-07/Mode1-20th-Mode2-Mean.stl` | Third template, only after a clean skin split. Paper: low mode 1 is the short direction. |
-| `tt_long` | Longer residual limb, mean soft-tissue profile | `version-2025-07/Mode1-80th-Mode2-Mean.stl` | Third template, same condition. Paper: high mode 1 is the long direction. |
-| `tt_conical` | Mean length, more slender profile | `version-2025-07/Mode1-Mean-Mode2-20th.stl` | Stretch. Confirm visually before the card says "conical." |
-| `tt_bulbous` | Mean length, fuller profile | `version-2025-07/Mode1-Mean-Mode2-80th.stl` | Stretch. Confirm visually before the card says "bulbous." |
-
-The published percentiles are 20th and 80th, not the 2.5th and 97.5th extremes plotted in the paper. The sign convention is supported by Table 2 and still has to be checked on the actual meshes.
-
-`Mean-Skin-Full-Size.stl` is a unit candidate for `tt_mean`, not a sixth anatomy. Bones files and combined `Mean-Limb` files are never offset into a socket. If the skin split fails, the library is `tt_mean` only, and length and circumference stay inside the clamps in [section 6](#6-residual-limb-stl-customization-algorithm).
+`Mean-Skin-Full-Size.stl` is only a candidate for the millimetre-scale copy of that same shape. Bones files, combined limb files, and mode-combination files are not offered to the user and are not offset into a socket. Length and circumference edits stay inside the clamps in [section 6](#6-residual-limb-stl-customization-algorithm). The server binds every session to `tt_mean`. The model does not pass a template id.
 
 ### 4.3 Template sidecar
 
-Each accepted template gets a hand-authored sidecar after inspection. The sidecar is data. It is not a landmark detector.
+`tt_mean` gets one hand-authored sidecar after inspection. The sidecar is data. It is not a landmark detector.
 
 ```yaml
 template_id: tt_mean
@@ -207,7 +197,7 @@ The 40 mm offset follows the 4 cm interval used in measurement studies. It is a 
 
 Posture may be recorded as `supine`, `sitting`, or `standing`. OpenLimbTT scans were supine. The demo does not correct for posture. A non-supine choice is copied into the report.
 
-Form ranges are what the page accepts. Each template then applies a tighter window from its own mesh. A typed number can be in range and still be outside that template.
+Form ranges are what the page accepts. The mean skin then applies a tighter window from its own mesh. A typed number can be in range and still be outside that window.
 
 ### 5.3 Fields
 
@@ -218,13 +208,13 @@ Form ranges are what the page accepts. Each template then applies a tighter wind
 - **Collected with:** a tape or ruler between those two points, shown on the form diagram.
 - **Controls:** axial scale of vertices distal to the annotated reference station. Proximal vertices stay fixed. Circumferences are not changed by this step.
 - **If missing:** customization does not run.
-- **If outside 0.70–1.40 times that template's reference-to-distal length:** `outside_template`. The agent may name a closer template (`tt_short` or `tt_long`) and waits for a yes. It does not extrapolate.
+- **If outside 0.70–1.40 times the mean skin's reference-to-distal length:** `outside_template`. The agent reports that length and asks for a value inside the window.
 
 #### Proximal circumference — required
 
 - **Question:** "What is the circumference 40 mm below the mid-patellar tendon, perpendicular to the long axis?"
 - **Input:** millimetres, form range 150–550, station `P`.
-- **Collected with:** a tape, snug, without compressing tissue. Default condition `bare`, because the templates are skin. `over_liner` is recorded and does not change the mesh rule.
+- **Collected with:** a tape, snug, without compressing tissue. Default condition `bare`, because the standardized shape is a skin surface. `over_liner` is recorded and does not change the mesh rule.
 - **Controls:** uniform radial scale of the cross-section at P. The section outline is preserved.
 - **If the implied scale is outside 0.75–1.35 of the template perimeter at P:** `outside_template`. The agent reports the template perimeter and does not apply the scale.
 
@@ -273,7 +263,15 @@ Scars, pain, skin condition, knee contracture, strength, liner model, body weigh
 
 ### 5.4 Minimum questionnaire
 
-The live demo asks length, station P, and station D. Mid circumference, AP/ML, distal shape, and side are accepted when volunteered. The form states that these numbers move a synthetic template and do not reconstruct a residual limb.
+The questionnaire is the start of the session. These three questions are on screen when the page loads:
+
+| Field | Question |
+|---|---|
+| `length_mm` | With the knee extended, what is the length from the mid-patellar tendon to the distal end, in millimetres? |
+| Station `P` | What is the circumference 40 mm below the mid-patellar tendon, in millimetres? |
+| Station `D` | What is the circumference 40 mm above the distal end, in millimetres? |
+
+Mid circumference, AP/ML, distal shape, and side stay behind "more detail" and are accepted when the practitioner answers them. The form states that the answers adjust the mean OpenLimbTT skin and do not reconstruct a residual limb. If a required answer is empty, `ask_user` repeats that question.
 
 Natural language fills the same document. "About 15 cm long, 30 cm near the top and 24 cm near the end" becomes `length_mm: 150`, P `300`, D `240`, with `precision: approximate`. The agent repeats the numbers before the first customization.
 
@@ -415,7 +413,7 @@ The agent may, after a failed certificate:
 - retry once with rim radius 0
 - try four fixed rotations if only the overhang check failed
 
-Length, circumferences, template choice, and edits outside those bands require `ask_user`. After two unsuccessful repairs, the agent stops and reports the measurements. The limb file is not rewritten to hide a socket failure.
+Length, circumferences, and edits outside those bands require `ask_user`. After two unsuccessful repairs, the agent stops and reports the measurements. The limb file is not rewritten to hide a socket failure.
 
 Safety rules enforced in tool code:
 
@@ -431,13 +429,15 @@ Safety rules enforced in tool code:
 
 ```text
 Browser
-  template cards, questionnaire, chat
+  measurement form, chat
   limb viewer, comparison, socket viewer
   validation cards, two confirmation buttons
+  print monitor (step, progress, OctoPrint fields)
         |
         v
 Python agent
   measurement document, phase filter, confirmation store, audit log
+  printer poll while a job is active
         |
         +-- Nemotron 3.5 Lightning through Red Hat vLLM
         |
@@ -500,7 +500,6 @@ A `fixable` error includes `error.code`, `error.reason`, and `error.valid`.
 
 ```text
 empty
-  → template_selected
   → measurements_ready
   → limb_current
   → socket_current
@@ -516,14 +515,13 @@ A failed limb edit stays on the previous `limb_current`. A lost printer link mov
 
 | Phase | Tools offered |
 |---|---|
-| `empty` | `list_limb_templates`, `inspect_limb_template`, `get_required_measurements`, `ask_user` |
-| `template_selected` | `validate_measurements`, `ask_user` |
-| `measurements_ready` | `customize_residual_limb` |
+| `empty` | `ask_user` repeats any unanswered required question. The questionnaire is already showing length, P, and D. |
+| `measurements_ready` | `validate_measurements`, then `customize_residual_limb` |
 | `limb_current` | `measure_customized_limb`, `compare_limb_versions`, `export_customized_limb_stl`, `validate_measurements`, `customize_residual_limb`, `generate_socket_shell` |
 | `socket_current` | `modify_socket_geometry`, `validate_socket_geometry`, `export_socket_stl` |
 | `socket_validated` | `list_print_profiles`, `request_confirmation` for slice, then `slice_model` |
 | `sliced`, printer ready, unused print confirmation | `get_printer_status`, `check_printer_readiness`, `start_print` |
-| `printing` or `unknown` | `get_printer_status`, `reconcile_printer_state`, `request_safe_pause` |
+| `printing` or `unknown` | `get_printer_status`, `reconcile_printer_state`, `request_safe_pause`. A question about the print is answered only after `get_printer_status`. |
 
 `start_print` is omitted while the phase is `unknown`.
 
@@ -535,73 +533,25 @@ Every object schema sets `additionalProperties: false`.
 
 ### A. Template and measurement tools
 
-#### `list_limb_templates`
-
-List transtibial templates the library can deform. **Straightforward.** Precondition: sidecar directory readable.
-
-Inputs: none.
-
-```json
-{"type": "object", "additionalProperties": false, "properties": {}}
-```
-
-Example: `{"name": "list_limb_templates", "arguments": {}}`
-
-Output: `{templates: [{template_id, label, units_status, available, source_file}]}`. `available` is false when units are unconfirmed or the skin split failed.
-
-Errors: none in the happy path. An empty available list is still `success`.
-
-Library: filesystem sidecars.
+`list_limb_templates` and `get_required_measurements` are not in the registry. The shape is always `tt_mean`, and the questionnaire already asks for length, P, and D.
 
 #### `inspect_limb_template`
 
 Report axis, length, and station perimeters for one template. **Straightforward** after the unit experiment; **uncertain** until bounding boxes are measured.
 
-Precondition: `template_id` exists.
+Precondition: the `tt_mean` sidecar is present. The call takes no arguments.
 
 ```json
-{
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["template_id"],
-  "properties": {
-    "template_id": {"type": "string", "enum": ["tt_mean", "tt_short", "tt_long", "tt_conical", "tt_bulbous"]}
-  }
-}
+{"type": "object", "additionalProperties": false, "properties": {}}
 ```
 
-Example: `{"name": "inspect_limb_template", "arguments": {"template_id": "tt_mean"}}`
+Example: `{"name": "inspect_limb_template", "arguments": {}}`
 
-Output: bounds in mm, `reference_to_distal_mm`, perimeters at P, M, and D, open-boundary flag.
+Output: `template_id: "tt_mean"`, bounds in mm, `reference_to_distal_mm`, perimeters at P, M, and D, open-boundary flag.
 
-Errors: `unknown_template`, `units_unconfirmed`, `combined_mesh`.
+Errors: `units_unconfirmed`, `combined_mesh`.
 
 Library: trimesh, or the sidecar when its hash matches.
-
-#### `get_required_measurements`
-
-Return the questionnaire contract for that template, including station definitions and the template's acceptance window. **Straightforward.** This is the step between template selection and validation. It does not measure the mesh again.
-
-Precondition: template exists.
-
-```json
-{
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["template_id"],
-  "properties": {
-    "template_id": {"type": "string"}
-  }
-}
-```
-
-Example: `{"name": "get_required_measurements", "arguments": {"template_id": "tt_mean"}}`
-
-Output: `{required: ["length_mm", "P", "D"], optional: ["M", "section_p", "distal_roundness", "side"], stations: [...], acceptance: {...}}`.
-
-Errors: `unknown_template`.
-
-Library: sidecar JSON. No mesh write.
 
 #### `validate_measurements`
 
@@ -609,15 +559,14 @@ Accept or reject a measurement document before any vertex moves. **Straightforwa
 
 Precondition: template units are `mm`. If `parent_revision_id` is set, locks are enforced.
 
-Required inputs: `template_id`, `measurements.length_mm`, stations P and D. Optional: `parent_revision_id`, M, `section_p`, `distal_roundness`, `side`, `posture`, per-field `correction`.
+Required inputs: `measurements.length_mm`, stations P and D. The server applies these to `tt_mean`. Optional: `parent_revision_id`, M, `section_p`, `distal_roundness`, `side`, `posture`, per-field `correction`.
 
 ```json
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["template_id", "measurements"],
+  "required": ["measurements"],
   "properties": {
-    "template_id": {"type": "string"},
     "parent_revision_id": {"type": "string"},
     "measurements": {
       "type": "object",
@@ -665,7 +614,6 @@ Example:
 {
   "name": "validate_measurements",
   "arguments": {
-    "template_id": "tt_mean",
     "measurements": {
       "length_mm": 150,
       "posture": "supine",
@@ -692,15 +640,14 @@ Run section 6 and write a new limb STL. **Uncertain** until the two-station reme
 
 Precondition: `validation_id` matches this measurement document and has not been consumed.
 
-Required: `template_id`, `validation_id`, `measurements`. Optional: `limb_id`, `parent_revision_id`, `allow_coarse`.
+Required: `validation_id`, `measurements`. The server copies `tt_mean`. Optional: `limb_id`, `parent_revision_id`, `allow_coarse`.
 
 ```json
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["template_id", "measurements", "validation_id"],
+  "required": ["measurements", "validation_id"],
   "properties": {
-    "template_id": {"type": "string"},
     "limb_id": {"type": "string"},
     "parent_revision_id": {"type": "string"},
     "validation_id": {"type": "string"},
@@ -716,7 +663,6 @@ Example:
 {
   "name": "customize_residual_limb",
   "arguments": {
-    "template_id": "tt_mean",
     "validation_id": "val_01",
     "measurements": {
       "length_mm": 150,
@@ -1016,7 +962,7 @@ Library: PrusaSlicer CLI `--export-gcode`. Time and filament are parsed from its
 
 #### `get_printer_status`
 
-Read connection, printer, and job. **Straightforward.** This does not decide whether a start is allowed.
+Read connection, printer, and job. **Straightforward.** This does not decide whether a start is allowed. During a print it is also the only source for a chat answer about progress.
 
 Inputs: none.
 
@@ -1026,11 +972,11 @@ Inputs: none.
 
 Example: `{"name": "get_printer_status", "arguments": {}}`
 
-Output: `{connection, printer, job}` summaries from the three GET endpoints.
+Output: one snapshot `{observed_at, step, connection, printer, job}`. `step` is the display step derived in section 12. The other three objects are the fields listed there, not a retelling by the model.
 
-Errors: `printer_unreachable`.
+Errors: `printer_unreachable`. The last good snapshot stays on screen and is marked stale.
 
-Library: OctoPrint REST.
+Library: OctoPrint REST, `GET /api/connection`, `GET /api/printer`, and `GET /api/job`. Permission `STATUS` only.
 
 #### `check_printer_readiness`
 
@@ -1177,7 +1123,8 @@ customized limb STL
   → slice_model
   → print confirmation
   → start_print
-  → get_printer_status
+  → poll the job and show the current step
+  → answer "how is the print going?" from that poll
   → reconcile or request_safe_pause
   → fabrication report
 ```
@@ -1189,7 +1136,7 @@ customized limb STL
 | Printer | [OctoPrint](https://docs.octoprint.org/en/main/api/) [Virtual Printer](https://docs.octoprint.org/en/main/development/virtual_printer.html) only. |
 | Start sequence | Upload, select with `print: false`, POST start, then `GET /api/job`. |
 | HTTP | 204 with an empty body means accepted. 409 means the state refused the command. Neither proves the job is printing. |
-| Progress | `get_printer_status` quotes completion and state from `GET /api/job`. |
+| Progress | The page polls the three GET endpoints. Chat quotes the same snapshot. |
 | Ledger | Every start and pause is stored by `job_id`. A second start is refused while the first is `sent`, `verified_printing`, or `unknown`. |
 | API key | `STATUS`, `FILES_UPLOAD`, `FILES_SELECT`, and `PRINT`. No `CONTROL`, so the model cannot send arbitrary G-code, jog, or set temperatures. |
 | Fault injector | `!!DEBUG:action_disconnect` uses a separate key. It is not an agent tool. |
@@ -1197,21 +1144,55 @@ customized limb STL
 
 A physical serial port fails `check_printer_readiness`. Firmware limits stay in firmware. This software does not disable them, and the virtual printer does not test them.
 
+### Print monitoring
+
+**Proposed.** After a verified start, the server polls OctoPrint about every 2 seconds while the phase is `printing`, `paused`, or `unknown`. The browser paints that snapshot. The model is not in the poll loop. A status question in chat calls `get_printer_status` once and answers from the returned snapshot, including its `observed_at`, so the sentence and the panel cannot disagree.
+
+The poll uses the three read endpoints already required for readiness. It does not send a job command, a temperature command, or G-code. The API key stays `STATUS`, `FILES_UPLOAD`, `FILES_SELECT`, and `PRINT`.
+
+The current step is one label, chosen from printer flags first and from `job.state` when the flags are absent:
+
+| Step | OctoPrint signal |
+|---|---|
+| Starting | Start was accepted, and `flags.printing` is still false. |
+| Printing | `flags.printing` is true, and pausing and cancelling are false. |
+| Pausing | `flags.pausing`, or `state` text `Pausing`. |
+| Paused | `flags.paused`, or `state` text `Paused`. |
+| Error | `flags.error`, `flags.closedOrError`, or a state such as `Error` or `Offline after error`. The documented state list is not exhaustive. |
+| Link lost | The poll failed. The phase moves to `unknown`. |
+| Finished | The ledger has `verified_printing` for this job, printing flags are now false, and no error flag is set. |
+
+The panel highlights that one step. A completion bar uses `progress.completion` beside the file position. Pausing, error, and link loss replace the bar's caption. They do not invent a percentage.
+
+Fields shown, from the [job](https://docs.octoprint.org/en/main/api/job.html), [printer](https://docs.octoprint.org/en/main/api/printer.html), [connection](https://docs.octoprint.org/en/main/api/connection.html), and [data model](https://docs.octoprint.org/en/main/api/datamodel.html) documents:
+
+| Source | Fields | What the panel does with them |
+|---|---|---|
+| `GET /api/job` | `state`; `error` when set; `job.file.name`, `origin`, `size`; `job.estimatedPrintTime`; `job.filament` length (mm) and volume (cm³); `progress.completion`, `filepos`, `printTime`, `printTimeLeft`, `printTimeLeftOrigin` | Step, file, percent, bytes printed, elapsed time, and time left. |
+| `GET /api/printer` | `state.text`; `state.flags` (`operational`, `printing`, `pausing`, `paused`, `cancelling`, `error`, `ready`, `closedOrError`); `temperature.tool0` and `bed` `actual` and `target` when present | Step selection. Temperatures are labeled as virtual-printer reports. |
+| `GET /api/connection` | `current.state`, `current.port`, `current.baudrate`, `current.printerProfile` | Port must stay `VIRTUAL`. Any other port is shown as a fault, not as a running job. |
+
+`printTimeLeft` is often missing at the start of a job. The panel and the chat both say the estimate is not available yet. `progress.completion` is documented as a percentage, while the job-API example is a fraction near 0.23. **Unresolved:** confirm that scale on this Virtual Printer before the page multiplies or divides it. Until then the page prints the number OctoPrint returned.
+
+A chat answer may state the step, completion, elapsed time, time left when present, file name, and whether the port is still virtual. It may not claim the socket is printed because a start returned 204. A status question does not pause, cancel, or start another job.
+
 ## 13. Frontend Architecture
 
 One page. No CAD editor.
 
 | Region | Behavior |
 |---|---|
-| Template cards | `tt_mean`, and short and long when available. Stretch cards stay disabled until their sidecars say `available`. |
-| Questionnaire | Length, P, and D visible. M, AP/ML, distal shape, and side behind "more detail." Millimetres, with centimetres shown beside the field. |
+| Shape label | "Mean transtibial skin (OpenLimbTT)," shown as a caption above the questionnaire. |
+| Questionnaire | The first thing on the page. Length, P, and D are required questions. M, AP/ML, distal shape, and side sit behind "more detail." |
 | Limb viewer | Title "Residual limb." Loads `role: residual_limb` only. |
 | Chat | Writes the same locks as the form. |
 | Comparison | Side-by-side limb revisions plus the `compare_limb_versions` table. |
 | Socket viewer | Title "Socket shell." Separate component, separate URL, `role: socket_shell`. |
 | Validation | Certificate checks, each named as a geometric check. |
 | Print bar | Slice confirmation and print confirmation are different buttons. Print stays disabled until readiness is true and a slice exists. |
-| Report | Download at the end. |
+| Print monitor | Appears after a verified start. Shows the current step, completion, time, file, filament estimate, virtual port, and temperatures when OctoPrint reports them. Updates from the server poll, including while the chat is idle. |
+| Chat during print | Stays on the same page. A progress question is sent to the agent, which calls `get_printer_status` and quotes that snapshot. |
+| Report | Download at the end. It includes the last observed step. |
 
 The browser displays STL URLs. It does not recompute geometry. Proposed stack: a small Python app and [three.js](https://threejs.org/). The measurement document and the phase live on the server.
 
@@ -1221,9 +1202,9 @@ Target length 4–6 minutes for the happy path. One recovery can be live. The ot
 
 ### 14.1 Happy path
 
-1. The user selects `tt_mean`.
-2. `get_required_measurements` returns length, P, and D.
-3. The user enters 150 mm, 300 mm, and 240 mm.
+1. The questionnaire asks for length, proximal circumference, and distal circumference. The mean transtibial skin is already the shape those answers will modify.
+2. The user answers 150 mm, 300 mm, and 240 mm.
+3. Any blank required question is asked again before a mesh call.
 4. `validate_measurements` then `customize_residual_limb`.
 5. `export_customized_limb_stl` feeds the limb viewer. `measure_customized_limb` is read back in chat.
 6. "Change the proximal circumference to 310 mm." Validation sets `correction` on P only. Revision `r2`.
@@ -1235,8 +1216,10 @@ Target length 4–6 minutes for the happy path. One recovery can be live. The ot
 12. The user approves `tt_draft_028`.
 13. `slice_model` reports time and filament.
 14. The user presses the print confirmation.
-15. `start_print` then `get_printer_status`.
-16. The report is saved.
+15. `start_print`, then the monitor polls until `get_printer_status` shows the Printing step.
+16. The user asks "How is the print going?" The agent calls `get_printer_status` and answers with the step, completion, and time left from that snapshot.
+17. When the ledger has `verified_printing` and the printer is operational again with no error flag, the step changes to Finished.
+18. The report is saved, including that last step.
 
 Proximal correction:
 
@@ -1244,7 +1227,6 @@ Proximal correction:
 {
   "name": "validate_measurements",
   "arguments": {
-    "template_id": "tt_mean",
     "parent_revision_id": "r1",
     "measurements": {
       "length_mm": 150,
@@ -1263,7 +1245,6 @@ Relative length correction, after the user has a locked length of 150:
 {
   "name": "validate_measurements",
   "arguments": {
-    "template_id": "tt_mean",
     "parent_revision_id": "r2",
     "measurements": {
       "length_mm": 135,
@@ -1287,7 +1268,7 @@ Distal 360 mm with proximal 300 mm. `validate_measurements` returns `fixable` / 
 
 ### 14.4 Printer disconnect
 
-After a verified start, the injector sends `!!DEBUG:action_disconnect` with the injector key. The next `get_printer_status` fails. `reconcile_printer_state` returns `unknown`. `request_safe_pause` records `pause_not_delivered` if the pause cannot be read back. A second `start_print` is rejected from the ledger.
+After a verified start, the injector sends `!!DEBUG:action_disconnect` with the injector key. The next poll fails. The monitor keeps the last good snapshot, marks it stale, and the step becomes Link lost. `reconcile_printer_state` returns `unknown`. If the user asks how the print is going, the agent says the link is down and does not invent a percentage. `request_safe_pause` records `pause_not_delivered` if the pause cannot be read back. A second `start_print` is rejected from the ledger.
 
 ### 14.5 Distal shape, if that parameter is on
 
@@ -1297,11 +1278,11 @@ After a verified start, the injector sends `!!DEBUG:action_disconnect` with the 
 
 | Choice | MVP | Later |
 |---|---|---|
-| Templates | `tt_mean`. Add `tt_short` and `tt_long` if the skin split is clean. | `tt_conical`, `tt_bulbous`. |
+| Shape | `tt_mean` for every session. The user answers the questionnaire. | — |
 | Questionnaire | Length, P, D. | M, AP/ML, distal shape, side. |
 | Deformation | Axial warp plus two-station radial scale. | Anisotropy, distal roundness, PCA scores. |
 | Socket | One offset shell. `modify_socket_geometry` for wall and rim. | Variable thickness, rectification. |
-| Print | `tt_draft_028` and one virtual start. | A second profile, a physical printer. |
+| Print | `tt_draft_028`, one virtual start, a live step view, and chat answers from the printer read-back. | A second profile, a physical printer. |
 | Model | Nemotron tool loop on vLLM. | MCP, NeMo Gym. |
 
 Do not simulate the tool trace, the measurement check, or the printer read-back. The stand-in shell in section 8 is allowed only after the offset experiment fails, and it must be labeled.
@@ -1309,26 +1290,26 @@ Do not simulate the tool trace, the measurement check, or the printer read-back.
 ### Proofs of concept, in order
 
 1. **Units and stations on the mean skin.** Load `Mean-Skin.stl` and `Mean-Skin-Full-Size.stl`. Record bounding boxes, longest axis, whether the surface is open, and perimeters on three planes. Mark the sidecar `mm` only for the file that is a plausible transtibial size under one documented scale. Annotate the reference station by looking at the mesh. Pass: planes at P and D each return one loop.
-2. **Skin split, then a two-station edit.** Try to separate skin from `Mode1-20th-Mode2-Mean.stl` and `Mode1-80th-Mode2-Mean.stl`. If that fails, ship `tt_mean` only. On `tt_mean`, apply length 150 mm, P 300 mm, and D 240 mm. Pass: targeted perimeters within 3 mm or 2%, face count unchanged, and a later edit of P leaves D at its target.
+2. **Two-station edit of the mean skin.** On `tt_mean`, apply length 150 mm, P 300 mm, and D 240 mm. Pass: targeted perimeters within 3 mm or 2%, face count unchanged, and a later edit of P leaves D at its target.
 3. **Closed shell.** Offset that limb with manifold3d at 1.5 mm clearance and 4 mm wall, trim the proximal end, and export a watertight STL. Run `validate_socket_geometry` and one PrusaSlicer dry run on `tt_draft_028`. Pass: one component, watertight, minimum wall at least 2 mm, slicer accepts the mesh. If manifold3d fails, try one Blender Solidify subprocess before changing the tool schema.
 
 | Person | Owns |
 |---|---|
 | 1 | vLLM flags, agent loop, measurement document, phase filter, confirmations, audit log. Starts against stub tools. |
 | 2 | Experiments 1–3, sidecars, limb deformation, socket shell, certificates. Critical path. |
-| 3 | The one INI, OctoPrint Virtual Printer, fault injection, the page, the report. A closed box can prove the printer gate before experiment 3 finishes. |
+| 3 | The one INI, OctoPrint Virtual Printer, the print monitor, fault injection, the page, the report. A closed box can prove the printer gate before experiment 3 finishes. |
 
 | When | Milestone |
 |---|---|
 | First hours | Experiment 1 done. Nemotron returns a tool call. Virtual printer answers `GET /api/job`. |
-| Next block | Experiment 2 done, or the library is explicitly one template. Experiment 3 attempted. |
+| Next block | Experiment 2 done. Experiment 3 attempted. |
 | Evening | One limb revision on the page. One shell certified, or the stand-in decision written down. |
-| Night | Slice, both confirmations, verified virtual start. |
+| Night | Slice, both confirmations, verified virtual start, and one chat answer that matches the monitor. |
 | Following morning | The three failure cases have been run. README matches what ran. |
 
 **Do not cut:** the unit check, a real limb deformation or an honest coarse fallback, a real shell or the labeled stand-in, structured tool errors, the Nemotron loop, and the confirmation gate.
 
-**Cut first:** the conical and bulbous templates, AP/ML, distal roundness, rim decoration, color-map diffs, MCP, Blender as the primary kernel, and NeMo Gym.
+**Cut first:** AP/ML, distal roundness, rim decoration, color-map diffs, MCP, Blender as the primary kernel, and NeMo Gym.
 
 ## 16. Research References and Licenses
 
@@ -1374,7 +1355,7 @@ Pin the license of trimesh, manifold3d, SciPy, PrusaSlicer, and OctoPrint in the
 
 The three largest implementation risks:
 
-1. **Units and skin extraction.** `Mean-Skin.stl` and `Mean-Skin-Full-Size.stl` share a triangle count and differ in content, and STL stores no units. Every mode file matches the combined limb's byte size, so short, long, conical, and bulbous templates do not exist as skin files until a split succeeds. If the split fails, the honest library is one template.
+1. **Units of the one skin file.** `Mean-Skin.stl` and `Mean-Skin-Full-Size.stl` share a triangle count and differ in content, and STL stores no units. The prototype uses whichever file the bounding-box check marks as millimetres. Mode files are not loaded.
 2. **Two-station deformation that remeasures.** Planes near an open boundary or a distal cap can return the wrong loop. A non-monotone scale curve can miss the targets. The reference station is a hand annotation, not a palpated tendon. Tape perimeter error in Seminati et al. is already above 5%, and OpenLimbTT's own full-surface recreation error has a median of 3.40 mm. The algorithm copies template shape between stations. It does not recover patient anatomy.
 3. **A closed socket from an open skin.** manifold3d may fail to offset and close `Mean-Skin`. Until experiment 3 passes, slicing and printing have no real input. The labeled stand-in shell is the fallback, and it must not be described as the customized socket.
 
@@ -1384,5 +1365,6 @@ Further limits, after those three:
 - A locked-field bug in the agent is contained only if `validate_measurements` enforces `correction`. Prompt text is not the control.
 - The Red Hat vLLM image may lack the Nemotron parsers. Confirm that before writing the client against them.
 - The workflow resembles a fitting workflow. Questionnaire copy, tool descriptions, and the report have to keep saying "demonstration" and cite OpenLimbTT.
+- The Virtual Printer simulates progress. Time left can be missing, temperatures are not a physical machine, and `progress.completion` must be checked against the live response before the page treats it as 0–100. A chat reply that does not follow a fresh `get_printer_status` call is a wrong answer.
 
 The report sentence is fixed: the limb is a synthetic OpenLimbTT template adjusted to the entered measurements, the socket is a demonstration shell, and the print is virtual.

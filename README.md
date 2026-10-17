@@ -25,7 +25,7 @@ The innovation this prototype is built to show is the model's ability to coordin
 1. [Project Overview and Problem Statement](#1-project-overview-and-problem-statement)
 2. [Scope and Nonclinical Demonstration Boundary](#2-scope-and-nonclinical-demonstration-boundary)
 3. [Target User Experience](#3-target-user-experience)
-4. [OpenLimbTT Dataset and Standardized Templates](#4-openlimbtt-dataset-and-standardized-templates)
+4. [OpenLimbTT Dataset and the Standardized Shape](#4-openlimbtt-dataset-and-the-standardized-shape)
 5. [Practitioner Questionnaire and Measurement Schema](#5-practitioner-questionnaire-and-measurement-schema)
 6. [Residual-Limb STL Customization Algorithm](#6-residual-limb-stl-customization-algorithm)
 7. [Conversational Refinement and Version Control](#7-conversational-refinement-and-version-control)
@@ -46,8 +46,8 @@ Preparing even a demonstration below-knee socket means importing a shape, decidi
 
 This agent is that demonstration path, for transtibial geometry only:
 
-1. The session opens on one fixed template, the OpenLimbTT mean transtibial skin. There is no template picker.
-2. The form prompts for the measurement fields directly: residual length, proximal circumference, and distal circumference.
+1. The practitioner answers the questionnaire. Every session uses the same standardized transtibial shape, the OpenLimbTT mean skin, applied automatically.
+2. The questions ask for residual length, proximal circumference, and distal circumference, in millimetres.
 3. The model calls deterministic tools that copy the template, deform it, and write a new residual-limb STL.
 4. They can correct a number or ask for a supported shape change in ordinary language. Each accepted change writes another limb revision and leaves other confirmed measurements unchanged.
 5. The model then calls a separate CAD tool that builds a demonstration socket shell around the current limb revision. The limb STL is preserved.
@@ -68,8 +68,8 @@ The prototype customizes synthetic transtibial residual limbs and generates belo
 
 In scope:
 
-- One standardized transtibial template: OpenLimbTT `Mean-Skin.stl`.
-- A form that asks immediately for residual length and two circumferences.
+- One standardized transtibial shape, OpenLimbTT `Mean-Skin.stl`, applied to every session.
+- A questionnaire the practitioner answers directly: residual length and two circumferences.
 - Conversational corrections that update one parameter.
 - A constant-offset demonstration shell, mesh checks, one slicing profile, and a gated virtual print.
 - An audit report that cites OpenLimbTT and states the nonclinical limit.
@@ -90,8 +90,8 @@ A tape measurement is something a trained practitioner can take at the point of 
 
 **Session:**
 
-1. The page opens on the measurement form. The single template is already selected and named. The practitioner is not asked to choose a shape.
-2. The form prompts for three fields, in millimetres: residual-limb length, proximal circumference, and distal circumference. Optional fields stay collapsed. Empty required fields are requested by name. The agent does not ask which template to use.
+1. The page opens on the questionnaire. The practitioner answers the questions. The mean transtibial skin is the shape behind every answer.
+2. The required questions are residual-limb length, proximal circumference, and distal circumference, each in millimetres. Optional questions stay collapsed. If a required answer is missing, the agent asks for that measurement by name.
 3. The limb viewer shows the customized residual-limb STL, labeled as the limb, not the socket.
 4. Chat and the form write the same measurement document. "Change the proximal circumference to 310 mm" updates that field only.
 5. A comparison view shows the previous and current limb revisions with measured differences.
@@ -101,7 +101,7 @@ A tape measurement is something a trained practitioner can take at the point of 
 
 The page never overlays the limb and the socket as if they were one object. Titles stay "Residual limb" and "Socket shell."
 
-## 4. OpenLimbTT Dataset and Standardized Templates
+## 4. OpenLimbTT Dataset and the Standardized Shape
 
 ### 4.1 Verified dataset facts
 
@@ -132,7 +132,7 @@ Binary STL size is `84 + 50 × triangles`. These published sizes divide evenly:
 
 ### 4.2 The one template
 
-The prototype has one template. Shape differences are entered as measurements, not chosen from a catalogue.
+Every session deforms this one shape. The questionnaire supplies the measurements. The practitioner does not pick among shapes.
 
 | ID | Shape | Published file |
 |---|---|---|
@@ -195,7 +195,7 @@ The 40 mm offset follows the 4 cm interval used in measurement studies. It is a 
 
 Posture may be recorded as `supine`, `sitting`, or `standing`. OpenLimbTT scans were supine. The demo does not correct for posture. A non-supine choice is copied into the report.
 
-Form ranges are what the page accepts. Each template then applies a tighter window from its own mesh. A typed number can be in range and still be outside that template.
+Form ranges are what the page accepts. The mean skin then applies a tighter window from its own mesh. A typed number can be in range and still be outside that window.
 
 ### 5.3 Fields
 
@@ -206,13 +206,13 @@ Form ranges are what the page accepts. Each template then applies a tighter wind
 - **Collected with:** a tape or ruler between those two points, shown on the form diagram.
 - **Controls:** axial scale of vertices distal to the annotated reference station. Proximal vertices stay fixed. Circumferences are not changed by this step.
 - **If missing:** customization does not run.
-- **If outside 0.70–1.40 times this template's reference-to-distal length:** `outside_template`. The agent reports the template length and asks for a length inside that window. It does not switch shapes.
+- **If outside 0.70–1.40 times the mean skin's reference-to-distal length:** `outside_template`. The agent reports that length and asks for a value inside the window.
 
 #### Proximal circumference — required
 
 - **Question:** "What is the circumference 40 mm below the mid-patellar tendon, perpendicular to the long axis?"
 - **Input:** millimetres, form range 150–550, station `P`.
-- **Collected with:** a tape, snug, without compressing tissue. Default condition `bare`, because the templates are skin. `over_liner` is recorded and does not change the mesh rule.
+- **Collected with:** a tape, snug, without compressing tissue. Default condition `bare`, because the standardized shape is a skin surface. `over_liner` is recorded and does not change the mesh rule.
 - **Controls:** uniform radial scale of the cross-section at P. The section outline is preserved.
 - **If the implied scale is outside 0.75–1.35 of the template perimeter at P:** `outside_template`. The agent reports the template perimeter and does not apply the scale.
 
@@ -261,15 +261,15 @@ Scars, pain, skin condition, knee contracture, strength, liner model, body weigh
 
 ### 5.4 Minimum questionnaire
 
-The form shows the three required fields as soon as the page loads:
+The questionnaire is the start of the session. These three questions are on screen when the page loads:
 
-| Field | Prompt |
+| Field | Question |
 |---|---|
-| `length_mm` | Length from the mid-patellar tendon to the distal end (mm) |
-| Station `P` | Circumference 40 mm below the mid-patellar tendon (mm) |
-| Station `D` | Circumference 40 mm above the distal end (mm) |
+| `length_mm` | With the knee extended, what is the length from the mid-patellar tendon to the distal end, in millimetres? |
+| Station `P` | What is the circumference 40 mm below the mid-patellar tendon, in millimetres? |
+| Station `D` | What is the circumference 40 mm above the distal end, in millimetres? |
 
-Mid circumference, AP/ML, distal shape, and side stay behind "more detail" and are accepted when volunteered. The form states that these numbers move the mean OpenLimbTT skin and do not reconstruct a residual limb. If a required field is empty, `ask_user` names that field. It does not ask the user to pick a template.
+Mid circumference, AP/ML, distal shape, and side stay behind "more detail" and are accepted when the practitioner answers them. The form states that the answers adjust the mean OpenLimbTT skin and do not reconstruct a residual limb. If a required answer is empty, `ask_user` repeats that question.
 
 Natural language fills the same document. "About 15 cm long, 30 cm near the top and 24 cm near the end" becomes `length_mm: 150`, P `300`, D `240`, with `precision: approximate`. The agent repeats the numbers before the first customization.
 
@@ -511,7 +511,7 @@ A failed limb edit stays on the previous `limb_current`. A lost printer link mov
 
 | Phase | Tools offered |
 |---|---|
-| `empty` | `ask_user` for any empty required field. The form is already showing length, P, and D. |
+| `empty` | `ask_user` repeats any unanswered required question. The questionnaire is already showing length, P, and D. |
 | `measurements_ready` | `validate_measurements`, then `customize_residual_limb` |
 | `limb_current` | `measure_customized_limb`, `compare_limb_versions`, `export_customized_limb_stl`, `validate_measurements`, `customize_residual_limb`, `generate_socket_shell` |
 | `socket_current` | `modify_socket_geometry`, `validate_socket_geometry`, `export_socket_stl` |
@@ -529,7 +529,7 @@ Every object schema sets `additionalProperties: false`.
 
 ### A. Template and measurement tools
 
-`list_limb_templates` and `get_required_measurements` are not in the registry. There is one template, and the three required fields are fixed on the form.
+`list_limb_templates` and `get_required_measurements` are not in the registry. The shape is always `tt_mean`, and the questionnaire already asks for length, P, and D.
 
 #### `inspect_limb_template`
 
@@ -1145,8 +1145,8 @@ One page. No CAD editor.
 
 | Region | Behavior |
 |---|---|
-| Template | A fixed label, "Mean transtibial skin (OpenLimbTT)." No cards and no selector. |
-| Questionnaire | Length, P, and D are the first fields on the page, each with its prompt and unit. M, AP/ML, distal shape, and side sit behind "more detail." |
+| Shape label | "Mean transtibial skin (OpenLimbTT)," shown as a caption above the questionnaire. |
+| Questionnaire | The first thing on the page. Length, P, and D are required questions. M, AP/ML, distal shape, and side sit behind "more detail." |
 | Limb viewer | Title "Residual limb." Loads `role: residual_limb` only. |
 | Chat | Writes the same locks as the form. |
 | Comparison | Side-by-side limb revisions plus the `compare_limb_versions` table. |
@@ -1163,9 +1163,9 @@ Target length 4–6 minutes for the happy path. One recovery can be live. The ot
 
 ### 14.1 Happy path
 
-1. The page shows the three fields for the mean transtibial skin. No template is chosen.
-2. The user enters 150 mm, 300 mm, and 240 mm in those fields.
-3. Empty fields are requested by name before any mesh call.
+1. The questionnaire asks for length, proximal circumference, and distal circumference. The mean transtibial skin is already the shape those answers will modify.
+2. The user answers 150 mm, 300 mm, and 240 mm.
+3. Any blank required question is asked again before a mesh call.
 4. `validate_measurements` then `customize_residual_limb`.
 5. `export_customized_limb_stl` feeds the limb viewer. `measure_customized_limb` is read back in chat.
 6. "Change the proximal circumference to 310 mm." Validation sets `correction` on P only. Revision `r2`.
@@ -1237,7 +1237,7 @@ After a verified start, the injector sends `!!DEBUG:action_disconnect` with the 
 
 | Choice | MVP | Later |
 |---|---|---|
-| Template | `tt_mean` only. The form prompts for length, P, and D. | More shapes, if a later project loads other skin files. |
+| Shape | `tt_mean` for every session. The user answers the questionnaire. | — |
 | Questionnaire | Length, P, D. | M, AP/ML, distal shape, side. |
 | Deformation | Axial warp plus two-station radial scale. | Anisotropy, distal roundness, PCA scores. |
 | Socket | One offset shell. `modify_socket_geometry` for wall and rim. | Variable thickness, rectification. |
@@ -1268,7 +1268,7 @@ Do not simulate the tool trace, the measurement check, or the printer read-back.
 
 **Do not cut:** the unit check, a real limb deformation or an honest coarse fallback, a real shell or the labeled stand-in, structured tool errors, the Nemotron loop, and the confirmation gate.
 
-**Cut first:** extra templates, AP/ML, distal roundness, rim decoration, color-map diffs, MCP, Blender as the primary kernel, and NeMo Gym.
+**Cut first:** AP/ML, distal roundness, rim decoration, color-map diffs, MCP, Blender as the primary kernel, and NeMo Gym.
 
 ## 16. Research References and Licenses
 

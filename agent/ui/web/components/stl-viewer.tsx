@@ -14,6 +14,8 @@ import {
   OrbitControls,
 } from "@react-three/drei";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import { LimbSkinMaterial } from "@/components/limb-skin-material";
+import { createLimbContour, limbSectionOffset } from "@/lib/limb-contour";
 
 // One measurement station to draw on the model: a ring at zMm from the
 // proximal (opening) end, labelled with its circumference when known.
@@ -52,24 +54,31 @@ function ellipsePoints(cx: number, cy: number, z: number, rx: number, ry: number
   });
 }
 
-// Displays an STL from a URL the server resolved. It never recomputes geometry
-// for the part itself; the annotation rings are sized from the loaded mesh's
-// own cross-sections so they sit on its surface.
+// Displays an STL from a URL the server resolved. The optional skin treatment
+// bends a private display copy; source STL and cross-section sizes stay intact.
+// Annotation rings follow the same centerline as that display copy.
 // CAD frame: X is ML, Y is AP, opening at z = 0, distal is +Z. Rotating +90°
 // about X puts the opening at the top and the distal end at the bottom.
 // Annotations are drawn in the same CAD frame, inside the rotated group.
 function Model({
   url,
   color,
+  skin,
   annotations,
   onSize,
 }: {
   url: string;
   color: string;
+  skin: boolean;
   annotations?: ViewerAnnotations;
   onSize: (size: { length: number; width: number }) => void;
 }) {
   const geometry = useLoader(STLLoader, url);
+  const displayGeometry = useMemo(() => skin ? createLimbContour(geometry) : geometry, [geometry, skin]);
+
+  useEffect(() => () => {
+    if (displayGeometry !== geometry) displayGeometry.dispose();
+  }, [displayGeometry, geometry]);
 
   const info = useMemo(() => {
     geometry.computeBoundingBox();
@@ -110,21 +119,24 @@ function Model({
 
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>
-      <mesh geometry={geometry}>
-        <meshStandardMaterial color={color} roughness={0.75} metalness={0} />
+      <mesh geometry={displayGeometry}>
+        {skin ? <LimbSkinMaterial /> : <meshStandardMaterial color={color} roughness={0.75} metalness={0} />}
       </mesh>
 
       {stations.map((station) => {
         const z = box.min.z + station.zMm;
         const { rx, ry } = info.radiiAt(z);
+        const offset = skin ? limbSectionOffset(z, box) : new THREE.Vector2();
+        const cx = center.x + offset.x;
+        const cy = center.y + offset.y;
         const text =
           station.circumferenceMm != null
             ? `${station.label} · ${Math.round(station.circumferenceMm)} mm`
             : station.label;
         return (
           <group key={station.label}>
-            <Line points={ellipsePoints(center.x, center.y, z, rx, ry)} color={INK} lineWidth={1.5} />
-            <Html position={[center.x + rx + 7, center.y, z]} center style={LABEL_STYLE}>
+            <Line points={ellipsePoints(cx, cy, z, rx, ry)} color={INK} lineWidth={1.5} />
+            <Html position={[cx + rx + 7, cy, z]} center style={LABEL_STYLE}>
               {text}
             </Html>
           </group>
@@ -169,11 +181,13 @@ function Model({
 export function StlViewer({
   url,
   color = "#d3ccc7",
+  skin = false,
   label,
   annotations,
 }: {
   url: string;
   color?: string;
+  skin?: boolean;
   label: string;
   annotations?: ViewerAnnotations;
 }) {
@@ -187,13 +201,14 @@ export function StlViewer({
     <div className="relative h-full w-full" role="img" aria-label={label}>
       <Canvas camera={{ position: [0, 0, 320], fov: 35 }} dpr={[1, 2]}>
         <color attach="background" args={["#f3f2ee"]} />
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[120, 200, 160]} intensity={1.1} />
+        <ambientLight intensity={skin ? 0.45 : 0.7} />
+        <directionalLight position={skin ? [-140, 180, 170] : [120, 200, 160]} intensity={skin ? 1.65 : 1.1} />
         <directionalLight position={[-160, -80, -120]} intensity={0.35} />
+        {skin && <directionalLight position={[160, 50, -100]} intensity={0.7} color="#ffe6ce" />}
         <Suspense fallback={null}>
           <Bounds fit clip observe margin={1.15}>
             <Center>
-              <Model url={url} color={color} annotations={annotations} onSize={setInfo} />
+              <Model url={url} color={color} skin={skin} annotations={annotations} onSize={setInfo} />
             </Center>
           </Bounds>
         </Suspense>

@@ -40,11 +40,8 @@ export default function ResidualLimbPage() {
         }
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <section aria-label="Residual limb" className="grid gap-2">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-base">Residual limb</h2>
-            <span className="eyebrow">Revision {session.limb?.revision_id ?? "…"}</span>
-          </div>
+        <section aria-labelledby="limb-viewer-heading" className="grid content-start gap-1">
+          <h2 id="limb-viewer-heading" className="eyebrow">Transtibial Residual Limb 3D demonstration</h2>
           <div className="h-[420px] overflow-hidden rounded-md border lg:h-[calc(100vh-15rem)] lg:min-h-[560px]">
             {session.loadError ? (
               <div className="grid h-full place-items-center p-6 text-center text-sm text-destructive">
@@ -53,7 +50,8 @@ export default function ResidualLimbPage() {
             ) : session.limb ? (
               <StlViewer
               url={session.limb.stl_url}
-              label="Residual limb 3D view"
+              skin
+              label="Transtibial Residual Limb 3D demonstration"
               annotations={{
                 lengthMm: session.measurements.length_mm,
                 stations: [

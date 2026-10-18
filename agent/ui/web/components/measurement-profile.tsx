@@ -15,6 +15,14 @@ type NumberKey =
   | "ap_depth_mm"
   | "ml_width_mm";
 
+// Standard profile evaluated by tools/cad/questionnaire.defaults at the
+// form's P/D stations (40 mm from each end), not the mesh's end sections.
+const STANDARD_PLACEHOLDERS: Partial<Record<NumberKey, string>> = {
+  length_mm: "140",
+  proximal_circumference_mm: "287.86",
+  distal_circumference_mm: "257.86",
+};
+
 // Form ranges from README §5. They only catch typos; validate_measurements on
 // the server decides whether the standardized shape can honour a number.
 const REQUIRED: { key: NumberKey; label: string; hint: string; min: number; max: number }[] = [
@@ -63,17 +71,24 @@ export function MeasurementProfile() {
         <Input
           id={f.key}
           inputMode="decimal"
+          placeholder={required ? STANDARD_PLACEHOLDERS[f.key] : undefined}
           value={measurements[f.key] ?? ""}
           onChange={(e) => setNumber(f.key, e.target.value)}
           aria-invalid={Boolean(errors[f.key])}
-          aria-describedby={`${f.key}-hint`}
-          className="h-9 pr-10 font-mono"
+          aria-required={required}
+          aria-describedby={`${f.key}-hint${required ? ` ${f.key}-reference measurement-placeholder-note` : ""}`}
+          className="h-9 pr-10 font-mono placeholder:text-[#767676] placeholder:opacity-100"
         />
         <span className="eyebrow pointer-events-none absolute top-1/2 right-3 -translate-y-1/2">mm</span>
       </div>
       <p id={`${f.key}-hint`} className={errors[f.key] ? "text-[11px] text-destructive" : "text-[11px] text-muted-foreground"}>
         {errors[f.key] ?? f.hint}
       </p>
+      {required && (
+        <span id={`${f.key}-reference`} className="sr-only">
+          Standardized residual limb reference: {STANDARD_PLACEHOLDERS[f.key]} millimetres.
+        </span>
+      )}
     </div>
   );
 
@@ -91,7 +106,12 @@ export function MeasurementProfile() {
         <span className="eyebrow">Limb {limb?.revision_id ?? "…"}</span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">{REQUIRED.map((f) => field(f, true))}</div>
+      <div className="grid gap-2">
+        <p id="measurement-placeholder-note" className="text-[11px] text-muted-foreground">
+          * Required. Gray numbers in empty fields are standard limb examples, not entered values.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">{REQUIRED.map((f) => field(f, true))}</div>
+      </div>
 
       <div className="grid gap-2">
         <span className="eyebrow">Optional</span>

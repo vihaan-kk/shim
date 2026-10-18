@@ -1,7 +1,7 @@
 # Shim web workbench
 
-This is the three-page frontend from README §3 and §13:
-- **Residual limb** (`/`): the 3D limb, the measurement profile, the agent chat, and Confirm.
+The landing page (`/`) introduces the tool-calling agent and links to the three-stage frontend from README §3 and §13:
+- **Residual limb** (`/limb`): the 3D limb, the measurement profile, the agent chat, and Confirm.
 - **Socket** (`/socket`): the socket shell, its geometric checks, the agent chat, and Confirm.
 - **Printer** (`/printer`): the job metadata, slice and print controls, the agent chat, and the report.
 
@@ -21,7 +21,7 @@ Open http://localhost:3000. The `predev` and `prebuild` scripts copy the referen
 
 ### Demo flow (mock)
 
-1. **Limb.** Type in the profile, or tell the agent "change the proximal circumference to 310 mm". Fill length, P and D, then press **Confirm limb**.
+1. **Limb.** Type in the profile, or tell the agent "change the proximal circumference to 310 mm". Fill length, P and D, select **Apply measurements**, then press **Confirm limb**.
 2. **Socket.** Optionally tell the agent "make the wall 6 mm", then press **Confirm socket**.
 3. **Printer.** Tell the agent "slice and print the socket", answer `draft_028`, and approve in the dialog. Ask "how is the print going?", then press **Demo: simulate link loss**.
 
@@ -42,8 +42,8 @@ To run against the real API, start the `web-real-api` entry in the repo's `.clau
 | `app/layout.tsx` | Fonts, the session provider, and the app shell. They live here so state survives navigation. |
 | `lib/session.tsx` | Session state: measurement document, limb and socket revisions, agent turns, confirmations, and printer polling |
 | `components/app-shell.tsx` | Top bar with the three steps. A step unlocks after the previous Confirm. Also holds the page heading, Confirm button, and global approval dialog. |
-| `components/measurement-profile.tsx` | Required and optional fields together, as README §5.4 specifies |
-| `components/agent-chat.tsx`, `chat-panel.tsx` | Agent chat with a collapsible tool-call trace |
+| `components/measurement-profile.tsx` | Required fields always expanded; optional fields in an expandable disclosure |
+| `components/agent-chat.tsx`, `chat-panel.tsx` | Agent chat with editable example instructions and a collapsible tool-call trace |
 | `components/print-panel.tsx` | One highlighted step plus the OctoPrint fields (README §12). Missing fields say "not reported". |
 | `components/print-controls.tsx` | Slice and print actions, and the confirmation dialog |
 | `components/stl-viewer.tsx`, `validation-list.tsx`, `header-dots.tsx` | The three.js viewer, the geometric checks, and the header dot field |
@@ -63,8 +63,9 @@ The UI components are shadcn/ui in the `base-nova` style, which is built on Base
 
 - The browser never computes geometry and never sends file paths. It sends ids and displays what tools return.
 - The limb has its own page. The socket page also offers an assembly demonstration using the matching confirmed limb revision: separated-to-seated translation, optional socket transparency, and a limb visibility toggle. Both display meshes receive the same limb-relative illustrative curve, preserving the form's P/M/D section sizes and axial length. The terminal section below D has an illustrative taper applied consistently to both parts. Source meshes and backend geometry remain unchanged; this is not a wall-thickness or clinical-fit simulation. Camera framing stays fixed across these controls. This demonstrates alignment, not clinical fit or collision-free insertion.
-- Limb Confirm stays disabled while length, P or D is empty. Socket Confirm stays disabled unless the geometric checks pass.
-- Socket measurements come only from the current validation report. Missing values say "Not reported". The socket viewer defaults to measured geometry (unaltered vertex positions); disabling that control enables the illustrative contour. Depth and circumference rings appear directly on measured geometry, using backend section heights and reported outer perimeters. Screen-reader text provides the same section values. Recorded mock values are labeled. No pair clearance or overlap is inferred from socket dimensions.
+- Each stage fits the viewport; panels scroll internally when expanded content or smaller screens need more space. The first stage places the compact viewer and measurement form beside a larger agent panel.
+- Manual measurements are drafts until **Apply measurements** succeeds. **Discard edits** restores the applied values; viewer annotations retain applied values while edits are pending. Limb Confirm stays disabled while length, P or D is empty, or edits are unapplied. Socket Confirm stays disabled unless the geometric checks pass.
+- Socket measurements come only from the current validation report. Missing values say "Not reported". The socket viewer defaults to measured geometry (unaltered vertex positions); disabling that control enables the illustrative contour. Depth and circumference rings appear directly on measured geometry, using backend section heights and reported outer perimeters. An expandable details area provides all section values, while the viewer labels opening, middle and distal rings to avoid crowding. Recorded mock values are labeled. No pair clearance or overlap is inferred from socket dimensions.
 - "Approve print" is enabled only when three things hold: the printer is ready, a job is sliced, and the agent has asked for a `start_print` confirmation.
 - When the link drops, the panel keeps the last good read and labels it "Link lost". Time left shows "unknown", and no percentage is invented.
 - "Simulate link loss" exists in mock mode only. Fault injection is never something the model can call.

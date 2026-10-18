@@ -2,16 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HeaderDots } from "@/components/header-dots";
 import { ConfirmDialog } from "@/components/print-controls";
-import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
-  { href: "/", label: "Residual limb" },
+  { href: "/limb", label: "Residual limb" },
   { href: "/socket", label: "Socket" },
   { href: "/printer", label: "Printer" },
 ] as const;
@@ -22,14 +20,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const unlocked = [true, session.limbConfirmed, session.socketConfirmed];
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="relative overflow-hidden border-b">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden">
+      <header className="relative shrink-0 overflow-hidden border-b">
         <HeaderDots className="pointer-events-none absolute inset-0 h-full w-full opacity-70" />
-        <div className="relative mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-8">
+        <div className="relative mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
           <Link href="/" className="text-lg">
-            Shim<span className="eyebrow ml-1 align-super">demo</span>
+            Shim
           </Link>
-          <nav aria-label="Session steps" className="order-3 flex w-full gap-1 sm:order-none sm:w-auto">
+          {pathname === "/" ? <Link href="/limb" className="rounded-full border px-4 py-2 text-sm hover:bg-muted">Open workbench ↗</Link> : <nav aria-label="Session steps" className="order-3 flex w-full gap-1 sm:order-none sm:w-auto">
             {STEPS.map((step, i) => {
               const active = pathname === step.href;
               const className = cn(
@@ -54,17 +52,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
               );
             })}
-          </nav>
+          </nav>}
           <span />
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8 sm:px-8">{children}</div>
-
-      <footer className="eyebrow mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-8">
-        Nonclinical demonstration · synthetic parametric limb · checks are CAD checks, not fit, comfort or
-        safety · parts are not wearable
-      </footer>
+      <main className="workbench-main mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden px-4 py-3 sm:px-6">{children}</main>
 
       <ConfirmDialog
         open={session.dialogOpen}
@@ -89,11 +82,10 @@ export function PageHeading({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div className="grid max-w-2xl gap-2">
-        <span className="eyebrow">{step}</span>
-        <h1 className="display-2">{title}</h1>
-        <p className="text-foreground/70">{description}</p>
+    <div className="page-heading mb-3 flex shrink-0 flex-wrap items-end justify-between gap-2">
+      <div className="grid max-w-2xl gap-1">
+        <h1 className="text-[clamp(1.5rem,3vw,2.25rem)] leading-tight tracking-tight">{step}: {title}</h1>
+        <p className="text-sm text-foreground/70">{description}</p>
       </div>
       {action}
     </div>

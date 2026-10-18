@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { AgentChat } from "@/components/agent-chat";
 import { ConfirmButton, PageHeading } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { ValidationList } from "@/components/validation-list";
 import { useSession } from "@/lib/session";
 
 const StlViewer = dynamic(() => import("@/components/stl-viewer").then((m) => m.StlViewer), {
@@ -15,8 +14,7 @@ const StlViewer = dynamic(() => import("@/components/stl-viewer").then((m) => m.
   loading: () => <div className="eyebrow grid h-full place-items-center">Loading viewer…</div>,
 });
 
-// README §13, page 2: the socket shell for the confirmed limb, its geometric
-// checks, the same agent, and Confirm.
+// Socket preview and agent; validation remains part of confirmation.
 export default function SocketPage() {
   const router = useRouter();
   const session = useSession();
@@ -31,10 +29,9 @@ export default function SocketPage() {
   if (!bundle) {
     return (
       <div className="grid gap-3 py-16">
-        <span className="eyebrow">Step 2 of 3</span>
-        <h1 className="display-2">Socket shell</h1>
+        <h1 className="text-[clamp(1.5rem,3vw,2.25rem)] leading-tight tracking-tight">Step 2 of 3: Socket shell</h1>
         <p className="text-foreground/70">Confirm the residual limb first. The socket is built from that revision.</p>
-        <Link href="/" className="text-sm underline underline-offset-4">
+        <Link href="/limb" className="text-sm underline underline-offset-4">
           ← Back to the residual limb
         </Link>
       </div>
@@ -56,14 +53,14 @@ export default function SocketPage() {
             disabled={!bundle.validation.passed || !matchingLimb}
             pending={session.confirmingSocket}
             onClick={confirm}
-            hint={!matchingLimb ? "Reconfirm the current limb to rebuild a matching socket" : bundle.validation.passed ? `Confirms ${bundle.socket.socket_id}` : "Geometric checks must pass"}
+            hint={!matchingLimb ? "Reconfirm the current limb to rebuild a matching socket" : bundle.validation.passed ? `Confirms ${bundle.socket.socket_id}` : "Socket needs adjustment. Ask the agent to resolve it."}
           >
             Confirm socket →
           </ConfirmButton>
         }
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <section aria-labelledby="socket-viewer-heading" className="grid content-start gap-1">
+      <div className="workspace-grid">
+        <section aria-labelledby="socket-viewer-heading" className="workspace-viewer">
           <h2 id="socket-viewer-heading" className="eyebrow">Socket shell 3D Demonstration</h2>
           <fieldset className="my-2 grid gap-2 rounded-md border bg-card px-3 py-2" disabled={!matchingLimb}>
             <legend className="sr-only">Assembly demonstration controls</legend>
@@ -100,9 +97,9 @@ export default function SocketPage() {
             </div>
           </fieldset>
           <p id="socket-view-mode" className="mb-2 text-xs text-muted-foreground" aria-live="polite">
-            {!matchingLimb ? "Matching confirmed limb unavailable." : !showLimb ? "Limb hidden. Socket and viewing position are unchanged." : insertion === 100 ? "Limb seated. Reveal interior to inspect the relationship between the models." : "Move the slider or select Seat limb to bring the aligned models together."}
+            {!matchingLimb ? "Matching confirmed limb unavailable." : !showLimb ? "Limb hidden. Socket and viewing position are unchanged." : insertion === 100 ? "Limb seated. Reveal interior to inspect the relationship between the models." : "Separated · use the slider or Seat limb."}
           </p>
-          <div className="h-[420px] overflow-hidden rounded-md border lg:h-[calc(100vh-15rem)] lg:min-h-[560px]">
+          <div className="viewer-canvas">
             <StlViewer
               url={bundle.socket.stl_url}
               shell
@@ -115,26 +112,9 @@ export default function SocketPage() {
               label={limbVisible ? `Confirmed residual limb and generated socket: ${insertion === 100 ? "seated" : "separated"}${revealInterior ? ", transparent socket" : ""}` : "Generated socket with residual limb hidden"}
             />
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {bundle.validation.measurements?.units !== "mm" ? "Socket measurements not reported." : measuredGeometry ? "Rings show outer socket circumferences; the vertical line shows depth." : "Enable measured geometry to show socket dimensions."}
-            {process.env.NEXT_PUBLIC_USE_MOCK !== "0" && " Recorded mock measurements."}
-          </p>
-          <ul className="sr-only" aria-label="Reported socket circumferences">
-            {(bundle.validation.measurements?.sections ?? []).filter(row => row.status === "measured").map(row => (
-              <li key={row.id}>{row.id}, {row.z_mm} mm below the opening: outer circumference {Number.isFinite(row.outer_perimeter_mm) ? `${row.outer_perimeter_mm.toFixed(1)} millimetres` : "not reported"}.</li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {measuredGeometry ? "Measured geometry: original backend mesh dimensions, with decorative surface materials." : "Illustrative contours: the natural curve and tip taper alter the displayed surface. Use measured geometry to inspect dimensions."}
-            {" "}This is not a clinical fit or insertion clearance test.
-          </p>
         </section>
-        <div className="grid min-w-0 content-start gap-4">
-          <div className="grid max-h-[420px] gap-3 overflow-y-auto rounded-md border bg-card p-4">
-            <h2 className="text-base">Geometric checks</h2>
-            <ValidationList data={bundle.validation} />
-          </div>
-          <AgentChat className="h-[440px]" />
+        <div className="workspace-sidebar">
+          <AgentChat className="workspace-agent" />
         </div>
       </div>
     </>

@@ -38,7 +38,8 @@ const OPTIONAL: { key: NumberKey; label: string; hint: string; min: number; max:
 ];
 
 export function MeasurementProfile() {
-  const { measurements, setMeasurements, applyMeasurements, applying, limb } = useSession();
+  const { measurements, setMeasurements, applyMeasurements, applying, limb, measurementsDirty, busy, appliedMeasurements } = useSession();
+  const [optionalOpen, setOptionalOpen] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<NumberKey | "pair", string>>>({});
 
   const setNumber = (key: NumberKey, raw: string) => {
@@ -57,6 +58,7 @@ export function MeasurementProfile() {
     if ((measurements.ap_depth_mm == null) !== (measurements.ml_width_mm == null)) {
       next.pair = "AP and ML go together. Fill both or neither.";
     }
+    if (next.pair || OPTIONAL.some(f => next[f.key])) setOptionalOpen(true);
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -71,6 +73,7 @@ export function MeasurementProfile() {
         <Input
           id={f.key}
           inputMode="decimal"
+          disabled={applying || busy}
           placeholder={required ? STANDARD_PLACEHOLDERS[f.key] : undefined}
           value={measurements[f.key] ?? ""}
           onChange={(e) => setNumber(f.key, e.target.value)}
@@ -94,7 +97,7 @@ export function MeasurementProfile() {
 
   return (
     <form
-      className="grid gap-4 rounded-md border bg-card p-4"
+      className="measurement-panel grid gap-2 rounded-md border bg-card p-3"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -108,14 +111,15 @@ export function MeasurementProfile() {
 
       <div className="grid gap-2">
         <p id="measurement-placeholder-note" className="text-[11px] text-muted-foreground">
-          * Required. Gray numbers in empty fields are standard limb examples, not entered values.
+          * Required. Gray placeholders are standard examples, not entered values.
         </p>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">{REQUIRED.map((f) => field(f, true))}</div>
+        <div className="grid gap-3 sm:grid-cols-3">{REQUIRED.map((f) => field(f, true))}</div>
       </div>
 
-      <div className="grid gap-2">
-        <span className="eyebrow">Optional</span>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">{OPTIONAL.map((f) => field(f, false))}</div>
+      <details open={optionalOpen} onToggle={(event) => setOptionalOpen(event.currentTarget.open)} className="rounded border px-3 py-2">
+        <summary className="cursor-pointer text-sm focus-visible:outline-2">Optional measurements and shape</summary>
+        <div className="mt-3 grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-3">{OPTIONAL.map((f) => field(f, false))}</div>
         {errors.pair && <p className="text-[11px] text-destructive">{errors.pair}</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1">
@@ -124,6 +128,7 @@ export function MeasurementProfile() {
             </Label>
             <select
               id="distal_shape"
+              disabled={applying || busy}
               value={measurements.distal_shape}
               onChange={(e) => setMeasurements({ ...measurements, distal_shape: e.target.value as Measurements["distal_shape"] })}
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -139,6 +144,7 @@ export function MeasurementProfile() {
             </Label>
             <select
               id="side"
+              disabled={applying || busy}
               value={measurements.side}
               onChange={(e) => setMeasurements({ ...measurements, side: e.target.value as Measurements["side"] })}
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -151,14 +157,17 @@ export function MeasurementProfile() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+        </details>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2">
         <p className="max-w-xs text-[11px] text-muted-foreground">
-          Values resize the standard demonstration limb. They do not reconstruct a residual limb.
+          Apply edits to regenerate the preview.
         </p>
-        <Button type="submit" variant="outline" disabled={applying} className="h-9 rounded-full px-4">
-          {applying ? "Updating…" : "Update model"}
+        {measurementsDirty && <Button type="button" variant="ghost" disabled={applying || busy} onClick={() => { setMeasurements({ ...appliedMeasurements }); setErrors({}); }} className="h-9 rounded-full px-3">Discard edits</Button>}
+        <Button type="submit" disabled={applying || busy || !measurementsDirty} className="h-9 rounded-full px-4">
+          {applying ? "Applying…" : "Apply measurements"}
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground" role="status">{applying ? "Generating the updated model…" : measurementsDirty ? "Unapplied edits — the preview still shows the last applied measurements." : "No unapplied edits."}</p>
     </form>
   );
 }

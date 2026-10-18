@@ -40,8 +40,8 @@ export function PrintBar({
         : "";
 
   return (
-    <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+    <div className="grid gap-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm break-words sm:grid-cols-4">
         <div>
           <dt className="eyebrow">Printer</dt>
           <dd>

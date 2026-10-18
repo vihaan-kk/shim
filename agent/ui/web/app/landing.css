@@ -1,0 +1,5 @@
+
+.landing-page { width: 100%; max-width: 1280px; margin: auto; min-height: 0; overflow-y: auto; padding: clamp(8px, 2vh, 24px) 0; }
+.landing-hero { display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: clamp(24px, 5vw, 80px); padding-bottom: clamp(24px, 4vh, 48px); }
+.landing-title { font-size: clamp(2.5rem, 4.2vw, 4.5rem); line-height: 1.02; letter-spacing: -.035em; font-weight: 400; }
+@media (max-width: 767px) { .landing-hero { grid-template-columns: 1fr; } .landing-title { font-size: clamp(2.5rem, 8vw, 4rem); } }

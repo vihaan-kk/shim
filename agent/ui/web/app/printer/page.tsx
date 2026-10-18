@@ -17,10 +17,9 @@ export default function PrinterPage() {
   if (!session.socketConfirmed) {
     return (
       <div className="grid gap-3 py-16">
-        <span className="eyebrow">Step 3 of 3</span>
-        <h1 className="display-2">Virtual printer</h1>
+        <h1 className="text-[clamp(1.5rem,3vw,2.25rem)] leading-tight tracking-tight">Step 3 of 3: Virtual printer</h1>
         <p className="text-foreground/70">Confirm the socket first. Only a confirmed socket can be sliced and printed.</p>
-        <Link href={session.limbConfirmed ? "/socket" : "/"} className="text-sm underline underline-offset-4">
+        <Link href={session.limbConfirmed ? "/socket" : "/limb"} className="text-sm underline underline-offset-4">
           ← Back
         </Link>
       </div>
@@ -34,8 +33,8 @@ export default function PrinterPage() {
         title="Virtual printer"
         description="Ask the agent to slice and print. Nothing starts without your approval, and every number here is read back from the printer."
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <div className="grid content-start gap-6">
+      <div className="workspace-grid">
+        <div className="grid min-h-0 content-start gap-3 overflow-y-auto">
           <section aria-label="Print actions" className="rounded-md border bg-card p-5">
             <PrintBar
               printer={session.printer}
@@ -60,7 +59,7 @@ export default function PrinterPage() {
             )}
           </div>
         </div>
-        <AgentChat className="h-[600px] lg:h-[calc(100vh-15rem)] lg:min-h-[560px]" />
+        <AgentChat className="workspace-agent" />
       </div>
     </>
   );

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import type { AgentExampleGroup } from "@/lib/agent-examples";
 import type { Pause, ToolResult } from "@/lib/types";
 
 export interface TraceStep {
@@ -111,7 +112,11 @@ export function ChatPanel({
   busy,
   onSend,
   onReviewConfirmation,
+  examples,
+  introduction,
 }: {
+  examples?: AgentExampleGroup[];
+  introduction?: string;
   items: ChatItem[];
   pending: Pause | null;
   busy: boolean;
@@ -119,10 +124,11 @@ export function ChatPanel({
   onReviewConfirmation: () => void;
 }) {
   const [draft, setDraft] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [items.length]);
 
   const awaitingApproval = pending?.kind === "confirmation";
@@ -140,12 +146,35 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3" aria-live="polite">
         {items.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            Ask the agent to check the printer, or to slice and print the current socket.
+            {introduction ?? "Tell the agent what you would like to do."}
           </p>
+        )}
+        {examples && (
+          <details open={items.length === 0} className="rounded-md border bg-secondary/40 p-2">
+            <summary className="cursor-pointer text-xs">Example instructions · select to edit</summary>
+            <p className="mt-2 text-xs text-muted-foreground">Choose an example, edit the message, then send.</p>
+            <div className="mt-2 space-y-2">
+              {examples.map((group, index) => (
+                <details key={group.title} open={index === 0}>
+                  <summary className="min-h-8 cursor-pointer py-1.5 text-xs font-medium">{group.title}</summary>
+                  <div className="flex flex-wrap gap-2 pb-1">
+                    {group.examples.map(example => (
+                      <button key={example.label} type="button" disabled={busy || awaitingApproval}
+                        aria-label={`${example.label}: ${example.prompt}`} title={example.prompt}
+                        onClick={() => { setDraft(example.prompt); inputRef.current?.focus(); }}
+                        className="min-h-9 rounded-full border bg-card px-3 py-2 text-left text-xs leading-relaxed hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50">
+                        {example.label}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </details>
         )}
         {items.map((item, itemIndex) =>
           item.role === "trace" ? (
@@ -187,10 +216,10 @@ export function ChatPanel({
           ),
         )}
         {busy && <p className="eyebrow animate-pulse">Agent is working…</p>}
-        <div ref={endRef} />
+
       </div>
 
-      <div className="border-t p-3">
+      <div className="shrink-0 border-t p-3">
         {awaitingApproval ? (
           <div className="flex items-center justify-between gap-3 rounded-md bg-accent px-3 py-2">
             <span className="text-sm">The agent is waiting for your approval.</span>
@@ -201,10 +230,11 @@ export function ChatPanel({
         ) : (
           <div className="flex items-end gap-2">
             <Textarea
+              ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   submit();
                 }

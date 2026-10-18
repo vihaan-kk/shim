@@ -41,12 +41,12 @@ export function SocketSectionAnnotations({ geometry, measurements }: {
       return { row, segments, maxX };
     });
   }, [geometry, measurements]);
-  return <>{sections.map(({ row, segments, maxX }) => segments.length > 0 && (
+  return <>{sections.map(({ row, segments, maxX }, index) => segments.length > 0 && (
     <group key={row.id}>
       <Line points={segments} segments color="#44403c" lineWidth={1.5} depthTest={false} renderOrder={2} />
-      <Html position={[maxX + 8, 0, row.z_mm]} center style={labelStyle}>
+      {(index === 0 || index === Math.floor(sections.length / 2) || index === sections.length - 1) && <Html position={[maxX + 8, 0, row.z_mm]} center style={labelStyle}>
         {NAMES[row.id] ?? row.id} · {row.outer_perimeter_mm.toFixed(1)} mm
-      </Html>
+      </Html>}
     </group>
   ))}</>;
 }

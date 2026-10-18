@@ -43,6 +43,8 @@ interface Session {
   loadError: string | null;
   // Limb page
   measurements: Measurements;
+  appliedMeasurements: Measurements;
+  measurementsDirty: boolean;
   setMeasurements: (m: Measurements) => void;
   limb: LimbRevision | null;
   applying: boolean;
@@ -82,6 +84,8 @@ export function useSession(): Session {
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [measurements, setMeasurements] = useState<Measurements>(EMPTY_MEASUREMENTS);
+  const [appliedMeasurements, setAppliedMeasurements] = useState<Measurements>(EMPTY_MEASUREMENTS);
+  const measurementsDirty = JSON.stringify(measurements) !== JSON.stringify(appliedMeasurements);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [limb, setLimb] = useState<LimbRevision | null>(null);
@@ -106,6 +110,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // The server is the source of truth; this applies its session snapshot.
   const applyServerSession = useCallback((s: Awaited<ReturnType<typeof api.getSession>>) => {
     setMeasurements(s.measurements);
+    setAppliedMeasurements(s.measurements);
     setLimb(s.limb);
     setSocket(s.socket);
     setSocketConfirmed(s.socket_confirmed);
@@ -177,7 +182,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         parent_revision_id: (data.parent_revision_id as string) ?? null,
         stl_url: String(data.stl_url),
       });
-      if (data.measurements) setMeasurements((m) => ({ ...m, ...(data.measurements as Partial<Measurements>) }));
+      if (data.measurements) {
+        setMeasurements((m) => ({ ...m, ...(data.measurements as Partial<Measurements>) }));
+        setAppliedMeasurements((m) => ({ ...m, ...(data.measurements as Partial<Measurements>) }));
+      }
     }
     // fit_socket_to_limb also makes a new socket revision (e.g. after a limb change in chat).
     if ((name === "modify_socket" || name === "fit_socket_to_limb") && data.socket_id) {
@@ -228,7 +236,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             } catch {
               // Keep the current state; routing below still applies.
             }
-            router.push(event.stage === "socket" ? "/socket" : event.stage === "printer" ? "/printer" : "/");
+            router.push(event.stage === "socket" ? "/socket" : event.stage === "printer" ? "/printer" : "/limb");
           } else if (event.type === "tool_result") {
             const index = steps.findLastIndex((s) => s.name === event.name && !s.result);
             if (index >= 0) steps = steps.map((s, i) => (i === index ? { ...s, result: event.result } : s));
@@ -287,6 +295,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     try {
       const { revision } = await api.applyMeasurements(measurements);
       setLimb(revision);
+      setAppliedMeasurements({ ...measurements });
     } catch (error) {
       setItems((prev) => [...prev, { id: newId(), role: "error", text: (error as Error).message }]);
     } finally {
@@ -295,7 +304,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [measurements]);
 
   const confirmLimb = useCallback(async () => {
-    if (!requiredFilled || !limb) return false;
+    if (!requiredFilled || !limb || measurementsDirty || applying) return false;
     setConfirmingLimb(true);
     try {
       setSocket(await api.confirmLimb(limb.revision_id));
@@ -306,7 +315,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setConfirmingLimb(false);
     }
-  }, [limb, requiredFilled]);
+  }, [limb, requiredFilled, measurementsDirty, applying]);
 
   const confirmSocket = useCallback(async () => {
     if (!socket) return false;
@@ -337,6 +346,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       loaded,
       loadError,
       measurements,
+      appliedMeasurements,
+      measurementsDirty,
       setMeasurements,
       limb,
       applying,
@@ -366,6 +377,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       loaded,
       loadError,
       measurements,
+      appliedMeasurements,
+      measurementsDirty,
       limb,
       applying,
       applyMeasurements,

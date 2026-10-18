@@ -106,3 +106,29 @@
   .display-2 { font-size: clamp(2.25rem, 5vw, 3.75rem); line-height: 1; letter-spacing: -0.025em; font-weight: 400; }
   .eyebrow { font-family: var(--font-jetbrains-mono); font-size: 0.75rem; color: var(--muted-foreground); }
 }
+
+/* The document stays fixed; each workspace owns its overflow. */
+.workspace-grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); flex: 1; min-height: 0; gap: 1rem; }
+.workspace-viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: .25rem; overflow-y: auto; }
+.viewer-canvas { flex: 1; min-height: 180px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); }
+.workspace-sidebar { display: flex; flex-direction: column; gap: .75rem; min-width: 0; min-height: 0; }
+.measurement-panel { max-height: 58%; flex-shrink: 0; overflow-y: auto; }
+.workspace-agent { flex: 1; min-height: 170px; }
+.workspace-checks { max-height: 30%; flex-shrink: 0; overflow-y: auto; }
+@media (max-width: 767px) {
+  .workspace-grid { grid-template-columns: minmax(0, 1fr); overflow-y: auto; align-content: start; }
+  .workspace-viewer { min-height: 340px; overflow: visible; }
+  .viewer-canvas { flex: none; height: 320px; }
+  .workspace-sidebar { min-height: 540px; }
+  .measurement-panel { max-height: none; }
+  .workspace-agent { min-height: 320px; }
+  .workspace-checks { max-height: 200px; }
+}
+@media (max-height: 620px) and (min-width: 768px) {
+  .workspace-sidebar { overflow-y: auto; }
+  .measurement-panel { max-height: none; }
+  .workspace-agent { flex-shrink: 0; min-height: 250px; }
+  .page-heading { max-height: 120px; overflow-y: auto; }
+}
+
+.workspace-sidebar > .workspace-viewer { flex: 1; }

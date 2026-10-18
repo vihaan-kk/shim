@@ -199,8 +199,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setSocket((s) =>
         s
           ? {
-              socket: { ...s.socket, socket_id: String(data.socket_id), stl_url: String(data.stl_url ?? s.socket.stl_url) },
-              validation: (data.validation as SocketValidation) ?? s.validation,
+              socket: {
+                ...s.socket,
+                socket_id: String(data.socket_id),
+                stl_url: String(data.stl_url ?? s.socket.stl_url),
+                limb_revision_id: typeof data.limb_revision_id === "string" ? data.limb_revision_id : s.socket.limb_revision_id,
+              },
+              validation: (data.validation as SocketValidation) ?? {
+                ...s.validation, passed: false, categories: {}, measurements: undefined,
+                error: { message: "Measurements and checks have not been reported for this socket revision." },
+              },
             }
           : s,
       );
@@ -234,7 +242,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             } catch {
               // Keep the current state; routing below still applies.
             }
-            router.push(event.stage === "socket" ? "/socket" : event.stage === "printer" ? "/printer" : "/");
+            router.push(event.stage === "socket" ? "/socket" : event.stage === "printer" ? "/printer" : "/limb");
           } else if (event.type === "tool_result") {
             const index = steps.findLastIndex((s) => s.name === event.name && !s.result);
             if (index >= 0) steps = steps.map((s, i) => (i === index ? { ...s, result: event.result } : s));

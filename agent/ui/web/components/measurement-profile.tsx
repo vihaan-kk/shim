@@ -78,24 +78,26 @@ export function MeasurementProfile() {
   );
 
   return (
-    <section className="grid gap-4 rounded-md border bg-card p-4" aria-label="Measurement profile">
+    <section className="measurement-panel grid gap-2 rounded-md border bg-card p-3" aria-label="Measurement profile">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-base">Measurement profile</h2>
         <span className="eyebrow">Limb {limb?.revision_id ?? "…"}</span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">{REQUIRED.map(field)}</div>
+      <div className="grid gap-3 sm:grid-cols-3">{REQUIRED.map(field)}</div>
 
-      <div className="grid gap-2">
-        <span className="eyebrow">Optional</span>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">{OPTIONAL.map(field)}</div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {choice("distal_shape", "Distal-end shape", DISTAL_SHAPE[measurements.distal_shape])}
-          {choice("side", "Side", SIDE[measurements.side])}
+      <details className="rounded border px-3 py-2">
+        <summary className="cursor-pointer text-sm focus-visible:outline-2">Optional measurements and shape</summary>
+        <div className="mt-3 grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-3">{OPTIONAL.map(field)}</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {choice("distal_shape", "Distal-end shape", DISTAL_SHAPE[measurements.distal_shape])}
+            {choice("side", "Side", SIDE[measurements.side])}
+          </div>
         </div>
-      </div>
+      </details>
 
-      <p className="border-t pt-3 text-[11px] text-muted-foreground">
+      <p className="border-t pt-2 text-[11px] text-muted-foreground">
         Ask the agent to change a value, for example &ldquo;make the residual length 150 mm&rdquo;. Values resize
         the standard demonstration limb. They do not reconstruct a residual limb.
       </p>

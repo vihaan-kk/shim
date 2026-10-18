@@ -97,6 +97,14 @@ export interface SocketValidation {
     units: "mm";
     depth_mm: number;
     volume_mm3: number;
+    proximal_opening?: {
+      status?: string;
+      inner_ml_diameter_mm?: number | null;
+      inner_ap_diameter_mm?: number | null;
+      inner_perimeter_mm?: number | null;
+      outer_perimeter_mm?: number | null;
+    };
+    distal_end?: { axial_wall_mm?: number | null };
     sections: {
       id: string;
       z_mm: number;

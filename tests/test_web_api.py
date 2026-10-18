@@ -22,6 +22,7 @@ class Events:
 @pytest.fixture(autouse=True)
 def workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(cad, "WORKSPACE", tmp_path)
+    monkeypatch.setattr(w, "FAKE_PRINTER", True)  # never read the real OctoPrint from tests
     return tmp_path
 
 
@@ -177,3 +178,45 @@ def test_lower_leg_hangs_under_the_socket_for_display(workspace):
     assert points[:, 1].max() > abs(points[:, 1].min())
     # Display only: no revision was made for it.
     assert [m["revision_id"] for m in cad._all_meta()] == [socket_id]
+
+
+def test_a_session_can_only_watch_or_cancel_its_own_print():
+    session = confirmed_session()
+    session.job = {"job_id": "job_mine", "revision_id": "socket-2"}
+    session.started_jobs.add("job_mine")
+    assert w._stage_guard(session, "cancel_print", {"job_id": "job_mine"}) is None
+    assert w._stage_guard(session, "get_job_progress", {"job_id": "job_mine"}) is None
+    other = w._stage_guard(session, "cancel_print", {"job_id": "job_theirs"})
+    assert other.status == "fatal" and other.error.code == "not_your_job"
+    assert w._stage_guard(session, "get_job_progress", {"job_id": "job_theirs"}).error.code == "not_your_job"
+
+
+def test_a_busy_shared_printer_refuses_before_approval(monkeypatch):
+    from tools.fakes import printer_fakes
+
+    session = confirmed_session()
+    session.job = {"job_id": "job_mine", "revision_id": "socket-2"}
+    monkeypatch.setitem(printer_fakes._printer, "busy_job", "job_theirs")
+    busy = w._stage_guard(session, "request_confirmation", {"action": "start_print", "subject": "job_mine"})
+    assert busy.status == "fatal" and busy.error.code == "printer_busy"
+    assert "try again" in busy.message
+
+    # Real printer: the wait comes from OctoPrint's time left, rounded up to whole minutes.
+    monkeypatch.setattr(w, "FAKE_PRINTER", False)
+
+    class Client:
+        def job(self):
+            return {"state": "Printing", "job": {"file": {"name": "job_theirs.gcode"}}, "progress": {"printTimeLeft": 1250}}
+
+    import tools.printer.tools as printer_tools
+    monkeypatch.setattr(printer_tools, "_client", lambda: Client())
+    assert w._printer_busy_elsewhere(session, "job_mine") == (True, 21)
+    real = w._stage_guard(session, "start_print", {"job_id": "job_mine", "confirmation_id": "c"})
+    assert real.error.code == "printer_busy" and "about 21 minutes" in real.message
+
+    class Mine(Client):
+        def job(self):
+            return {"state": "Printing", "job": {"file": {"name": "job_mine.gcode"}}, "progress": {}}
+
+    monkeypatch.setattr(printer_tools, "_client", lambda: Mine())
+    assert w._printer_busy_elsewhere(session, "job_mine") == (False, None)

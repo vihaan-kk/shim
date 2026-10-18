@@ -22,6 +22,7 @@ The browser sends revision ids, never file paths.
 from __future__ import annotations
 
 import json
+import math
 import os
 import queue
 import re
@@ -260,6 +261,16 @@ def _stage_guard(session: Session, name: str, args: dict):
                 "or explain that flow to the user."
             ),
         )
+    # One printer is shared by every visitor: a session may only watch or cancel its own job.
+    if name in ("cancel_print", "get_job_progress"):
+        own = session.started_jobs | {(session.job or {}).get("job_id")}
+        if args.get("job_id") not in own:
+            return fatal(
+                code="not_your_job",
+                reason=f"{args.get('job_id')} is not a print from this session.",
+                message="Only this session's own print can be checked or cancelled. Tell the user.",
+            )
+        return None
     wants_print = name in PRINT_STAGE_TOOLS or (
         name == "request_confirmation" and args.get("action") == "start_print"
     )
@@ -332,7 +343,45 @@ def _stage_guard(session: Session, name: str, args: dict):
             ),
             message="Do not start or confirm prints for other parts or stale jobs.",
         )
+    busy, minutes = _printer_busy_elsewhere(session, job_id)
+    if busy:
+        wait = f"about {minutes} minute{'s' if minutes != 1 else ''}" if minutes else "a while"
+        return fatal(
+            code="printer_busy",
+            reason=f"The shared printer is printing another visitor's job; it should be free in {wait}.",
+            message=(
+                f"Do not ask for approval or start now. Tell the user the printer is busy with another "
+                f"print and to try again in {wait}. Their sliced job {job_id} is kept."
+            ),
+        )
     return None
+
+
+def _printer_busy_elsewhere(session: Session, job_id: str | None) -> tuple[bool, int | None]:
+    """Whether the shared printer is printing someone else's job, and minutes until it frees up.
+
+    A failed read returns (False, None): start_print reads the printer again itself.
+    """
+    own = session.started_jobs | {job_id}
+    try:
+        if FAKE_PRINTER:
+            from tools.fakes import printer_fakes
+
+            busy = printer_fakes._printer.get("busy_job")
+            return bool(busy) and busy not in own, None
+        from tools.printer.tools import _client
+
+        job = _client().job()
+    except Exception:
+        return False, None
+    state = str(job.get("state") or "").lower()
+    if not state.startswith(("printing", "pausing", "paused")):
+        return False, None
+    name = ((job.get("job") or {}).get("file") or {}).get("name")
+    if name in {f"{j}.gcode" for j in own if j}:
+        return False, None
+    left = (job.get("progress") or {}).get("printTimeLeft")
+    return True, (math.ceil(left / 60) if left else None)
 
 
 def _stage_handler(session: Session, stage: str):

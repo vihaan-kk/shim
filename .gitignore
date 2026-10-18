@@ -21,3 +21,7 @@ workspace/*
 
 # macOS
 .DS_Store
+
+# Generated on the server by deploy/start.sh
+deploy/server.env
+deploy/Caddyfile

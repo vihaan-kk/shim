@@ -129,3 +129,28 @@ curl -s localhost:8000/v1/models >/dev/null && echo model ok; curl -s localhost:
 ```
 
 If the chat hangs or errors, check the model first, then the API's terminal.
+
+## Hosting everything on Brev
+
+The `deploy/` scripts run the whole app on the Brev instance, next to vLLM, behind one public URL.
+
+| Script | Where | What it does |
+|---|---|---|
+| `deploy/sync.sh [host]` | laptop | Copies this checkout (and `.env`) to `~/shim` on the instance. |
+| `deploy/setup.sh` | instance, once | Installs uv, Node 22, Caddy and PrusaSlicer 2.8.1 (the last Linux AppImage), then the Python deps, OctoPrint and npm packages. |
+| `deploy/start.sh <public-url>` | instance | Builds the page for that URL and starts OctoPrint (:5001), the API (:8001), Next.js (:3000) and Caddy (:8080) in the tmux session `shim`. |
+
+```bash
+deploy/sync.sh
+```
+
+```bash
+ssh shim-hardware1 '~/shim/deploy/start.sh https://8080-bbr7fjhsb.gobrev.dev'
+```
+
+- Public URL: https://8080-bbr7fjhsb.gobrev.dev (port 8080 opened with `brev ports open shim-hardware1 8080 --protocol http --public`).
+- Login: user `shim`, password `shim` (hardcoded in `deploy/start.sh`; override with `SHIM_PASSWORD`).
+- Caddy sends `/api/*` to the API without buffering the agent's stream, and everything else to Next.js, so the page and API share one origin.
+- The API calls vLLM at `localhost:8000` with `VLLM_API_KEY` from `.env`; `deploy/server.env` overrides the laptop values.
+- See the services with `ssh shim-hardware1 -t tmux attach -t shim`. To update after a code change, run `sync.sh` then `start.sh` again; that restarts everything and resets sessions.
+- The instance's `workspace/` is separate from your laptop's.

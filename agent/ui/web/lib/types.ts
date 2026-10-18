@@ -32,13 +32,15 @@ export interface Pause {
   kind: PauseKind;
   text: string;
   // For "confirmation": { action: "start_print", subject: job_id }
-  details: { action?: string; subject?: string };
+  // For "question": may carry options: string[] from ask_user, shown as buttons.
+  details: { action?: string; subject?: string; options?: string[] };
 }
 
 // One event from Agent.on_event, plus the final pause of a turn.
 export type AgentEvent =
   | { type: "tool_call"; name: string; args: Record<string, unknown> }
   | { type: "tool_result"; name: string; result: ToolResult }
+  | { type: "navigate"; stage: string }
   | { type: "pause"; pause: Pause };
 
 // ----- tools/printer/tools.py -----

@@ -60,7 +60,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001/api"
 
 async function* readEventStream(response: Response): AsyncIterable<AgentEvent> {
   if (!response.ok || !response.body) {
-    throw new Error(`Agent request failed: HTTP ${response.status}`);
+    throw await responseError(response, `Agent request failed: HTTP ${response.status}`);
   }
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
@@ -91,15 +91,31 @@ function post(path: string, body: unknown): Promise<Response> {
   });
 }
 
+// The server's error bodies carry the real reason: a ToolResult envelope
+// ({ error: { reason, ... } }) for tool rejections (e.g. a 422 from
+// /measurements), or { error: "..." } for conflicts. Surface that reason
+// instead of a bare HTTP status, which tells the user nothing.
+async function responseError(response: Response, fallback: string): Promise<Error> {
+  try {
+    const body = await response.json();
+    const reason =
+      (typeof body?.error === "string" ? body.error : body?.error?.reason) ?? body?.message;
+    if (reason) return new Error(String(reason));
+  } catch {
+    // Body was not JSON; fall through to the status line.
+  }
+  return new Error(fallback);
+}
+
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await post(path, body);
-  if (!response.ok) throw new Error(`POST ${path} failed: HTTP ${response.status}`);
+  if (!response.ok) throw await responseError(response, `POST ${path} failed: HTTP ${response.status}`);
   return (await response.json()) as T;
 }
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { credentials: "include" });
-  if (!response.ok) throw new Error(`GET ${path} failed: HTTP ${response.status}`);
+  if (!response.ok) throw await responseError(response, `GET ${path} failed: HTTP ${response.status}`);
   return (await response.json()) as T;
 }
 

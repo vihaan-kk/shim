@@ -55,20 +55,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          {api.isMock ? (
-            <Badge variant="outline" className="bg-background font-mono">
-              Mock data
-            </Badge>
-          ) : (
-            <span />
-          )}
+          <span />
         </div>
       </header>
 
       <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8 sm:px-8">{children}</div>
 
       <footer className="eyebrow mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-8">
-        Nonclinical demonstration · synthetic OpenLimbTT-based shape · checks are CAD checks, not fit, comfort or
+        Nonclinical demonstration · synthetic parametric limb · checks are CAD checks, not fit, comfort or
         safety · parts are not wearable
       </footer>
 

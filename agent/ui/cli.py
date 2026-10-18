@@ -12,6 +12,7 @@ from pathlib import Path
 
 from agent.llm import VllmClient
 from agent.loop import Agent, Pause
+from common.result import success
 from tools import registry
 
 
@@ -41,7 +42,13 @@ def handle(agent: Agent, pause: Pause) -> None:
     """Keep resuming the agent until it gives an answer or stops."""
     while True:
         if pause.kind == "question":
-            answer = input(f"\nagent asks: {pause.text}\nyou> ")
+            options = pause.details.get("options") or []
+            print(f"\nagent asks: {pause.text}")
+            for i, option in enumerate(options, 1):
+                print(f"  {i}. {option}")
+            answer = input("you> ").strip()
+            if answer.isdigit() and 1 <= int(answer) <= len(options):
+                answer = options[int(answer) - 1]
             pause = agent.answer_question(answer)
         elif pause.kind == "confirmation":
             print(f"\nCONFIRM {pause.details['action']} {pause.details['subject']}:\n  {pause.text}")
@@ -57,6 +64,10 @@ def main() -> None:
     registry.load_tools()
     print(f"Tools: {', '.join(registry.names())}")
     agent = Agent(VllmClient(), on_event=show_event)
+    # The terminal has no pages; acknowledge stage moves instead of navigating.
+    agent.stage_handler = lambda stage: success(
+        f"Noted: the user wants the {stage} stage (the terminal has no pages).", {"stage": stage}
+    )
     print("Type a request. Ctrl-D to quit.\n")
     while True:
         try:

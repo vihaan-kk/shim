@@ -1,6 +1,6 @@
 # Frontend API contract
 
-This is the HTTP layer the web page (`agent/ui/web`) expects for the three-page flow in README §3 and §13: residual limb, then socket, then printer. **It is proposed, not built.** Until it exists, the page runs on mock data (`NEXT_PUBLIC_USE_MOCK=1`, the default).
+This is the HTTP layer the web page (`agent/ui/web`) expects for the three-page flow in README §3 and §13: residual limb, then socket, then printer. **It is built** in `agent/web_api.py`. Start it with `uv run uvicorn agent.web_api:app --port 8001` (`FAKE_TOOLS=1` uses the fake printer), then run the page with `NEXT_PUBLIC_USE_MOCK=0` (the `api` and `web-real-api` entries in `.claude/launch.json`). Without it the page runs on mock data.
 
 The server wraps the existing agent and adds no tool logic of its own.
 
@@ -59,6 +59,9 @@ data: {"type":"pause","pause":{"kind":"confirmation","text":"Print ...","details
 
 - `tool_call` and `tool_result` events come from `on_event`.
 - Every turn ends with exactly one `pause`. Its `kind` is `answer`, `question`, `confirmation` or `stopped`.
+- A `question` pause may carry `details.options`: a list of short choices from `ask_user`, which the page shows as buttons under the question. Clicking one sends its text via `/api/answer`; typing a free-form answer stays possible. Agent and question text is Markdown and the page renders it as such.
+- A turn may also contain a `{"type": "navigate", "stage": "socket"}` event, emitted when the agent calls `move_to_stage`. The server performs the stage change first (going to `socket` builds the socket from the current limb if there is none; going to `printer` confirms the socket if it passed its checks), so the page should refresh `GET /api/session` and then route: `limb` → `/`, `socket` → `/socket`, `printer` → `/printer`.
+- Printing is stage-gated per session: until the socket has been confirmed, the agent's `prepare_print`, `slice` and `start_print` calls (and a `start_print` confirmation request) are refused with a fatal `stage_gate` tool result, whichever page the user asks from.
 - The agent is synchronous. Run it in a worker thread and drain a queue into the SSE response.
 - If `/api/chat` arrives while a question or confirmation is pending, return 409, because `Agent.send` raises in that case.
 
@@ -112,11 +115,12 @@ These endpoints read only. They never call `start_print`, never change the job l
 
 `GET /api/files/{id}/{role}.stl` serves the STL for `role`, which is `residual_limb` or `socket_shell`. The `stl_url` fields above should point here.
 
-## Open dependencies (not frontend work)
+## How the server fills the gaps listed earlier
 
-1. **The CAD functions are not agent tools.** `tools/registry.py` imports `tools.cad.tools`, which does not exist. The functions in `tools/cad/*.py` return plain dicts, not `ToolResult`.
-2. **Tool names differ.** The README uses `customize_residual_limb`, `validate_socket_geometry` and `slice_model`. The code has `modify_limb`, `validate_socket`, `prepare_print` and `slice`. The mock uses the README names for limb edits and `modify_socket` for socket edits.
-3. **No STL for limb edits.** `modify_limb` writes `.step` and `.json` but no `.stl`, and the viewer needs an STL for each revision.
-4. **No slice confirmation.** README §13 wants slice and print confirmations as separate controls, but `agent/builtins.py` has only `CONFIRMABLE_ACTIONS = ["start_print"]`. "Approve slice" is shown disabled with a tooltip.
-5. **The snapshot needs more data than `get_printer_status` returns.** `get_printer_status` returns no `printTime`, temperatures or file name. The README §12 server poll has to collect those fields itself.
-6. **The workspace layout is not agreed.** The printer tools read `workspace/revisions/<id>/part.stl` plus a `validated` marker. The CAD tools write to whatever `output_dir` they are given.
+1. **CAD tools.** `tools/cad/tools.py` registers the CAD library as agent tools (`create_part`, `inspect_part`, `validate_measurements`, `customize_residual_limb`, `fit_socket_to_limb`, `modify_socket`, `check_fit`, `validate_part`, plus the adapter, pylon and foot tools). Each returns the `ToolResult` envelope.
+2. **Limb measurements.** `GET /api/session` returns length, P and D filled with the standard limb's values and the optional fields empty. `POST /api/measurements` sends only the values that differ from those defaults to `validate_measurements`, then `customize_residual_limb`. `ap_depth_mm` / `ml_width_mm` map to the tools' `ap_mm` / `ml_mm`; `side: "template"` means no side.
+3. **STL files.** `GET /api/files/{id}/{role}.stl` writes `view.stl` from the revision's STEP on first request, in the design orientation. (The print STL, `part.stl`, is turned opening-up and is not served.)
+4. **Socket validation on the page.** A socket made by `modify_socket` or `fit_socket_to_limb` comes back with `data.validation` set to "not validated" (no categories). `validate_part` results carry the full `validate_socket` report in `data.validation`. `POST /api/socket/confirm` returns 409 unless the current socket passed.
+5. **Slice confirmation.** Still only `start_print` is confirmable; "Approve slice" stays disabled.
+6. **Print snapshot.** Read from OctoPrint's job, printer and connection endpoints on each poll, with the step rules of README §12. A failed read returns the last snapshot as `Link lost`, `stale: true`.
+7. **Page changes the model should know.** The form, Confirm limb and Confirm socket add a short `[workbench page]` note to the agent's conversation, so a later chat request builds on them.

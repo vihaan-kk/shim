@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -14,8 +16,58 @@ export interface TraceStep {
 }
 
 export type ChatItem =
-  | { id: string; role: "user" | "agent" | "question" | "error"; text: string }
+  | { id: string; role: "user" | "agent" | "question" | "error"; text: string; options?: string[] }
   | { id: string; role: "trace"; steps: TraceStep[] };
+
+// Agent replies are Markdown (the model writes **bold**, lists, `code`).
+// Render them with compact styles that match the panel instead of showing
+// the raw markers. Raw HTML stays off (react-markdown default), and user
+// messages are never rendered as Markdown.
+const MARKDOWN_COMPONENTS: Components = {
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5 first:mt-0 last:mb-0">{children}</ul>,
+  ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5 first:mt-0 last:mb-0">{children}</ol>,
+  li: ({ children }) => <li className="[&>p]:mb-0">{children}</li>,
+  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  a: ({ children, href }) => (
+    <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+      {children}
+    </a>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{children}</code>
+  ),
+  pre: ({ children }) => (
+    <pre className="my-2 overflow-x-auto rounded-md bg-secondary p-3 font-mono text-xs [&>code]:bg-transparent [&>code]:p-0">
+      {children}
+    </pre>
+  ),
+  h1: ({ children }) => <h1 className="mb-1 mt-3 text-base font-semibold first:mt-0">{children}</h1>,
+  h2: ({ children }) => <h2 className="mb-1 mt-3 text-base font-semibold first:mt-0">{children}</h2>,
+  h3: ({ children }) => <h3 className="mb-1 mt-3 font-semibold first:mt-0">{children}</h3>,
+  h4: ({ children }) => <h4 className="mb-1 mt-3 font-semibold first:mt-0">{children}</h4>,
+  blockquote: ({ children }) => (
+    <blockquote className="my-2 border-l-2 pl-3 text-muted-foreground">{children}</blockquote>
+  ),
+  hr: () => <hr className="my-3" />,
+  table: ({ children }) => (
+    <div className="my-2 overflow-x-auto">
+      <table className="w-full border-collapse text-xs">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => <th className="border px-1.5 py-1 text-left font-semibold">{children}</th>,
+  td: ({ children }) => <td className="border px-1.5 py-1">{children}</td>,
+};
+
+function MessageMarkdown({ text }: { text: string }) {
+  return (
+    <div className="break-words">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 const STATUS_STYLE: Record<string, string> = {
   success: "text-success",
@@ -74,6 +126,12 @@ export function ChatPanel({
   }, [items.length]);
 
   const awaitingApproval = pending?.kind === "confirmation";
+  // Choice buttons belong to the currently pending question only; once it is
+  // answered (or an identical question was asked earlier) they disappear.
+  const pendingQuestionIndex =
+    pending?.kind === "question"
+      ? items.findLastIndex((item) => item.role === "question" && item.text === pending.text)
+      : -1;
   const submit = () => {
     const text = draft.trim();
     if (!text || busy || awaitingApproval) return;
@@ -89,7 +147,7 @@ export function ChatPanel({
             Ask the agent to check the printer, or to slice and print the current socket.
           </p>
         )}
-        {items.map((item) =>
+        {items.map((item, itemIndex) =>
           item.role === "trace" ? (
             <ToolTrace key={item.id} steps={item.steps} />
           ) : (
@@ -99,12 +157,32 @@ export function ChatPanel({
                 "max-w-[90%] rounded-md px-3 py-2 text-sm leading-relaxed",
                 item.role === "user" && "ml-auto bg-primary text-primary-foreground",
                 item.role === "agent" && "bg-card ring-1 ring-border",
-                item.role === "question" && "bg-accent ring-1 ring-border",
+                item.role === "question" && "w-full max-w-[95%] bg-accent ring-1 ring-border",
                 item.role === "error" && "bg-destructive/10 text-destructive",
               )}
             >
               {item.role === "question" && <span className="eyebrow mb-1 block">Agent asks</span>}
-              {item.text}
+              {item.role === "agent" || item.role === "question" ? (
+                <MessageMarkdown text={item.text} />
+              ) : (
+                <span className="whitespace-pre-wrap">{item.text}</span>
+              )}
+              {item.role === "question" && itemIndex === pendingQuestionIndex && item.options?.length ? (
+                <div className="mt-3 grid gap-2">
+                  <span className="eyebrow">Choose one, or type your own answer below</span>
+                  {item.options.map((option) => (
+                    <Button
+                      key={option}
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => onSend(option)}
+                      className="h-auto justify-start whitespace-normal bg-card px-3 py-2 text-left text-sm"
+                    >
+                      {option}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ),
         )}

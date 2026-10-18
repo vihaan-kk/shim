@@ -30,8 +30,10 @@ REAL_MODULES = [
     "tools.cad.tools",
     "tools.printer.tools",
 ]
+# The CAD tools are local and deterministic, so fake mode uses the real ones
+# and only swaps out the printer.
 FAKE_MODULES = [
-    "tools.fakes.cad_fakes",
+    "tools.cad.tools",
     "tools.fakes.printer_fakes",
 ]
 

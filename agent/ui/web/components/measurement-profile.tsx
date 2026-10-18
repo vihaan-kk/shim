@@ -133,7 +133,7 @@ export function MeasurementProfile() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
         <p className="max-w-xs text-[11px] text-muted-foreground">
-          Values adjust the mean OpenLimbTT skin. They do not reconstruct a residual limb.
+          Values resize the standard demonstration limb. They do not reconstruct a residual limb.
         </p>
         <Button type="submit" variant="outline" disabled={applying} className="h-9 rounded-full px-4">
           {applying ? "Updating…" : "Update model"}

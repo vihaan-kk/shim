@@ -105,7 +105,7 @@ def test_full_print_with_confirmation():
     agent.send("start")
     tool_results = [json.loads(m["content"]) for m in llm.seen[-1] if m["role"] == "tool"]
     assert tool_results[-2]["status"] == "success"
-    assert tool_results[-2]["data"]["verified"] is False
+    assert tool_results[-2]["data"]["verified"] is True
     assert tool_results[-1]["error"]["code"] == "duplicate_start"
 
 

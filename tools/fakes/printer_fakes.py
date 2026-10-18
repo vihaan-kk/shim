@@ -165,8 +165,9 @@ def start_print(job_id: str, confirmation_id: str):
     job["state"] = "printing"
     _printer["busy_job"] = job_id
     return success(
-        f"Print command accepted for {job_id}. Printing has not been verified yet; check get_job_progress.",
-        {"job_id": job_id, "state": "Printing", "verified": False},
+        # Same shape as the real tool, which reads the job back before saying verified.
+        f"Print of {job_id} started and confirmed by the printer (Printing).",
+        {"job_id": job_id, "state": "Printing", "verified": True},
     )
 
 

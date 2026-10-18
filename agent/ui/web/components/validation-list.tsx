@@ -16,6 +16,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 export function ValidationList({ data }: { data: SocketValidation }) {
   return (
     <div className="grid gap-3">
+      {Object.keys(data.categories).length === 0 && (
+        <p className="rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground">
+          {(data.error as { message?: string } | null)?.message ?? "Not validated yet."}
+        </p>
+      )}
       {Object.entries(data.categories).map(([key, category]) => {
         const failed = category.checks.filter((c) => !c.passed).length;
         return (

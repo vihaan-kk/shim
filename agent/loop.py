@@ -53,11 +53,18 @@ class Agent:
         max_steps: int = 20,
         max_fixable_in_a_row: int = 3,
         on_event: Callable[[str, dict], None] = no_events,
+        tool_guard: Callable[[str, dict], ToolResult | None] | None = None,
+        stage_handler: Callable[[str], ToolResult] | None = None,
     ):
         self.llm = llm
         self.max_steps = max_steps
         self.max_fixable_in_a_row = max_fixable_in_a_row
         self.on_event = on_event  # lets the UI show the tool trace
+        # Optional host hooks. tool_guard may veto any tool call before it runs
+        # (the web API uses it to lock printing until the socket stage is done);
+        # stage_handler performs move_to_stage for hosts that have stages.
+        self.tool_guard = tool_guard
+        self.stage_handler = stage_handler
         self.messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.pending: PendingCall | None = None
         self.fixable_streak: dict[str, int] = {}
@@ -128,6 +135,19 @@ class Agent:
                 self._add_tool_result(call_id, problem)
                 continue
 
+            if self.tool_guard is not None:
+                blocked = self.tool_guard(name, args)
+                if blocked is not None:
+                    self.on_event("tool_result", {"name": name, "result": blocked.to_dict()})
+                    self._add_tool_result(call_id, blocked)
+                    continue
+
+            if name == builtins.MOVE_TO_STAGE:
+                result = self._run_stage_handler(args)
+                self.on_event("tool_result", {"name": name, "result": result.to_dict()})
+                self._add_tool_result(call_id, result)
+                continue
+
             if name in builtins.NAMES:
                 if pause:
                     # One person-facing step at a time; the model can ask again later.
@@ -145,6 +165,18 @@ class Agent:
             self._add_tool_result(call_id, result)
         return pause
 
+    def _run_stage_handler(self, args: dict) -> ToolResult:
+        stage = args.get("stage")
+        if stage not in ("limb", "socket", "printer"):
+            return fixable(
+                code="invalid_stage", reason="stage must be limb, socket or printer.",
+                message="Call move_to_stage with a valid stage.")
+        if self.stage_handler is None:
+            return fixable(
+                code="unavailable", reason="This host has no stages to move between.",
+                message="Tell the user this interface has no stages; keep helping them here.")
+        return self.stage_handler(stage)
+
     def _pause_for_person(self, call_id: str, name: str, args: dict) -> Pause | None:
         if name == builtins.ASK_USER:
             question = args.get("question", "").strip()
@@ -153,8 +185,21 @@ class Agent:
                     code="missing_argument", reason="ask_user needs a question.",
                     message="Call ask_user with a question."))
                 return None
+            options = args.get("options")
+            if options is not None:
+                if (
+                    not isinstance(options, list)
+                    or not options
+                    or len(options) > 6
+                    or any(not isinstance(option, str) or not option.strip() for option in options)
+                ):
+                    self._add_tool_result(call_id, fixable(
+                        code="invalid_options", reason="ask_user options must be 1-6 non-empty strings.",
+                        message="Call ask_user again with valid options, or without options."))
+                    return None
+                options = [option.strip() for option in options]
             self.pending = PendingCall(call_id, name, args)
-            return Pause("question", question)
+            return Pause("question", question, {"options": options} if options else {})
 
         problem = registry.check_arguments(builtins.SCHEMAS[1]["function"]["parameters"], args)
         if problem:

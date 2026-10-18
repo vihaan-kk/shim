@@ -4,13 +4,27 @@ An SLM-powered agent for a synthetic below-knee residual limb. The session opens
 
 The model does not deform meshes or operate the printer. It chooses a tool and fills in structured arguments. Deterministic Python code checks those arguments, edits geometry, validates the result, and returns a typed result. The agent asks when a measurement is missing or inconsistent, keeps earlier confirmed values, and never starts a print without a separate human confirmation.
 
-**Status:** design plan. This repository does not yet contain an agent, templates, geometry code, a slicer profile, or a printer integration. Nothing in this document is an implemented component.
+**Status:** implemented hackathon prototype. The repository contains the agent loop and web API, the CAD tools for the limb and socket, geometry validation, PrusaSlicer profiles, and the OctoPrint virtual-printer integration described below. The body of this document is the original design plan, kept for the research and rationale; where a planned name or step differs from the code, the code is the source of truth. See `docs/FRONTEND_API.md` for the API as built and `docs/STRUCTURE.md` for the current folder layout.
+
+**Cleanup (2026-10-17):** the unused empty folders `servers/`, `templates/`, `eval/`, and `data/openlimbtt/` were removed. The agent calls tools directly in process (no MCP servers were built), parametric part code lives in `tools/cad/`, the standard limb and socket data lives in `data/profiles/` and `data/reference/`, and no eval harness was built.
 
 **Dataset:** [OpenLimbTT](https://github.com/abel-research/OpenLimbTT) version `2025-07`. The STL files are not vendored here.
 
 **Clinical boundary:** measurement-driven reconstruction is an approximation of a standardized template. It is not a reconstruction of a person's anatomy. Generated sockets are non-wearable demonstration prototypes. A passing geometry check means the mesh is closed, inside the configured wall and printer limits, and ready to slice. It does not establish fit, comfort, load transfer, or safety on a person.
 
 The innovation this prototype is built to show is the model's ability to coordinate a multi-stage, stateful path from the residual-limb page, through a confirmed socket, to a virtual print.
+
+## Running it
+
+Copy `sample.env` to `.env` and fill in the OctoPrint API key. The model is served on a Brev instance (`scripts/brev/serve.sh` runs on the instance) and forwarded to this machine with `scripts/brev/tunnel.sh <instance-name>`, which exposes vLLM at `http://localhost:8000/v1`.
+
+```bash
+scripts/octoprint/start.sh                                     # OctoPrint virtual printer, port 5001
+uv run uvicorn agent.web_api:app --port 8001                   # workbench API
+NEXT_PUBLIC_USE_MOCK=0 npm --prefix agent/ui/web run dev -- --port 3001   # web workbench (real API)
+```
+
+The `api` and `web-real-api` entries in `.claude/launch.json` run the API and the real-API page together. Running the web app without `NEXT_PUBLIC_USE_MOCK=0` (port 3000) uses mock data instead of the backend. A terminal chat is also available: `uv run python -m agent.ui.cli`. Tests that need no model: `uv run pytest`.
 
 ## How to read this plan
 

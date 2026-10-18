@@ -5,6 +5,7 @@
 // the measurement document and the print state.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api, type SocketBundle } from "@/lib/api";
 import type { ChatItem, TraceStep } from "@/components/chat-panel";
 import type {
@@ -15,6 +16,7 @@ import type {
   PreparedJob,
   PrinterStatus,
   PrintSnapshot,
+  SocketValidation,
   ToolResult,
 } from "@/lib/types";
 
@@ -94,32 +96,39 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const router = useRouter();
+
   const [printer, setPrinter] = useState<ToolResult<PrinterStatus> | null>(null);
   const [job, setJob] = useState<PreparedJob | null>(null);
   const [started, setStarted] = useState(false);
   const [snapshot, setSnapshot] = useState<PrintSnapshot | null>(null);
 
-  // Load the server's session once; the server is the source of truth.
+  // The server is the source of truth; this applies its session snapshot.
+  const applyServerSession = useCallback((s: Awaited<ReturnType<typeof api.getSession>>) => {
+    setMeasurements(s.measurements);
+    setLimb(s.limb);
+    setSocket(s.socket);
+    setSocketConfirmed(s.socket_confirmed);
+    setJob(s.job);
+    setStarted(s.started);
+    setPending(s.pending);
+  }, []);
+
+  // Load the server's session once.
   useEffect(() => {
     let alive = true;
     api
       .getSession()
       .then((s) => {
         if (!alive) return;
-        setMeasurements(s.measurements);
-        setLimb(s.limb);
-        setSocket(s.socket);
-        setSocketConfirmed(s.socket_confirmed);
-        setJob(s.job);
-        setStarted(s.started);
-        setPending(s.pending);
+        applyServerSession(s);
         setLoaded(true);
       })
       .catch((error: Error) => alive && setLoadError(error.message));
     return () => {
       alive = false;
     };
-  }, []);
+  }, [applyServerSession]);
 
   const requiredFilled = REQUIRED_FIELDS.every((key) => measurements[key] != null);
 
@@ -153,8 +162,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [socketConfirmed, started]);
 
   const handleToolResult = useCallback((name: string, result: ToolResult) => {
-    if (result.status !== "success") return;
     const data = result.data as Record<string, unknown>;
+    // validate_part reports for the current socket whether it passed or not.
+    if (name === "validate_part" && data.validation) {
+      setSocket((s) =>
+        s && s.socket.socket_id === data.revision_id ? { ...s, validation: data.validation as SocketValidation } : s,
+      );
+      return;
+    }
+    if (result.status !== "success") return;
     if (name === "customize_residual_limb") {
       setLimb({
         revision_id: String(data.revision_id),
@@ -163,10 +179,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       });
       if (data.measurements) setMeasurements((m) => ({ ...m, ...(data.measurements as Partial<Measurements>) }));
     }
-    if (name === "modify_socket" && data.socket_id) {
+    // fit_socket_to_limb also makes a new socket revision (e.g. after a limb change in chat).
+    if ((name === "modify_socket" || name === "fit_socket_to_limb") && data.socket_id) {
+      // A new socket revision has not been checked yet; the server sends that state.
       setSocket((s) =>
-        s ? { ...s, socket: { ...s.socket, socket_id: String(data.socket_id), stl_url: String(data.stl_url ?? s.socket.stl_url) } } : s,
+        s
+          ? {
+              socket: { ...s.socket, socket_id: String(data.socket_id), stl_url: String(data.stl_url ?? s.socket.stl_url) },
+              validation: (data.validation as SocketValidation) ?? s.validation,
+            }
+          : s,
       );
+      setSocketConfirmed(false);
     }
     if (name === "prepare_print" || name === "slice") setJob(data as unknown as PreparedJob);
     if (name === "start_print" && data.verified) setStarted(true);
@@ -187,6 +211,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           if (event.type === "tool_call") {
             steps = [...steps, { name: event.name, args: event.args }];
             pushTrace();
+          } else if (event.type === "navigate") {
+            // The server performed the stage change (built/confirmed the
+            // socket as needed). Refresh from it before routing, so the
+            // destination page's own guards see the new state.
+            try {
+              applyServerSession(await api.getSession());
+            } catch {
+              // Keep the current state; routing below still applies.
+            }
+            router.push(event.stage === "socket" ? "/socket" : event.stage === "printer" ? "/printer" : "/");
           } else if (event.type === "tool_result") {
             const index = steps.findLastIndex((s) => s.name === event.name && !s.result);
             if (index >= 0) steps = steps.map((s, i) => (i === index ? { ...s, result: event.result } : s));
@@ -199,7 +233,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             else
               setItems((prev) => [
                 ...prev,
-                { id: newId(), role: pause.kind === "question" ? "question" : "agent", text: pause.text },
+                {
+                  id: newId(),
+                  role: pause.kind === "question" ? "question" : "agent",
+                  text: pause.text,
+                  ...(pause.kind === "question" ? { options: pause.details?.options } : {}),
+                },
               ]);
           }
         }
@@ -209,7 +248,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setBusy(false);
       }
     },
-    [handleToolResult],
+    [handleToolResult, applyServerSession, router],
   );
 
   const send = useCallback(

@@ -51,7 +51,26 @@ export default function ResidualLimbPage() {
                 Could not load the session: {session.loadError}
               </div>
             ) : session.limb ? (
-              <StlViewer url={session.limb.stl_url} label="Residual limb 3D view" />
+              <StlViewer
+              url={session.limb.stl_url}
+              label="Residual limb 3D view"
+              annotations={{
+                lengthMm: session.measurements.length_mm,
+                stations: [
+                  { label: "P", zMm: 40, circumferenceMm: session.measurements.proximal_circumference_mm },
+                  {
+                    label: "M",
+                    zMm: (session.measurements.length_mm ?? 140) / 2,
+                    circumferenceMm: session.measurements.mid_circumference_mm,
+                  },
+                  {
+                    label: "D",
+                    zMm: (session.measurements.length_mm ?? 140) - 40,
+                    circumferenceMm: session.measurements.distal_circumference_mm,
+                  },
+                ],
+              }}
+            />
             ) : (
               <div className="eyebrow grid h-full place-items-center">Loading session…</div>
             )}

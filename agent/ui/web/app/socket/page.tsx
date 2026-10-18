@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { AgentChat } from "@/components/agent-chat";
 import { ConfirmButton, PageHeading } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { engravingUrl, lowerLegUrl } from "@/lib/lower-leg";
 import { useSession } from "@/lib/session";
 
 const StlViewer = dynamic(() => import("@/components/stl-viewer").then((m) => m.StlViewer), {
@@ -23,6 +24,7 @@ export default function SocketPage() {
   const [measuredGeometry, setMeasuredGeometry] = useState(true);
   const [insertion, setInsertion] = useState(0);
   const [revealInterior, setRevealInterior] = useState(false);
+  const [showLowerLeg, setShowLowerLeg] = useState(false);
   const matchingLimb = session.limb?.revision_id === bundle?.socket.limb_revision_id ? session.limb : null;
   const limbVisible = showLimb && Boolean(matchingLimb);
 
@@ -76,6 +78,11 @@ export default function SocketPage() {
                 Reveal interior
               </label>
               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={showLowerLeg} onChange={(event) => setShowLowerLeg(event.target.checked)}
+                  className="size-4 accent-primary focus-visible:outline-2 focus-visible:outline-offset-4" />
+                Show lower leg
+              </label>
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
                 <input type="checkbox" checked={measuredGeometry} onChange={(event) => setMeasuredGeometry(event.target.checked)}
                   className="size-4 accent-primary focus-visible:outline-2 focus-visible:outline-offset-4" />
                 Use measured geometry
@@ -109,6 +116,9 @@ export default function SocketPage() {
               revealInterior={revealInterior}
               measuredGeometry={measuredGeometry}
               socketMeasurements={bundle.validation.measurements}
+              lowerLegUrl={lowerLegUrl(bundle.socket.stl_url)}
+              showLowerLeg={showLowerLeg}
+              engravingUrl={engravingUrl(bundle.socket.stl_url)}
               label={limbVisible ? `Confirmed residual limb and generated socket: ${insertion === 100 ? "seated" : "separated"}${revealInterior ? ", transparent socket" : ""}` : "Generated socket with residual limb hidden"}
             />
           </div>

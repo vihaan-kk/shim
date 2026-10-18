@@ -142,3 +142,38 @@ def test_each_turn_names_the_sessions_own_parts():
     assert note.startswith("[workbench state] Current limb limb-1 (length 140 mm, P 287.86 mm, D 257.86 mm)")
     assert "current socket socket-2 (built for limb-1, confirmed)" in note
     assert "no socket yet" in w._state_note(make_session())
+
+
+def test_a_session_whose_files_were_deleted_is_replaced(workspace, monkeypatch):
+    class Cookies:
+        cookies = {w.COOKIE: "old"}
+
+    write_meta(workspace, "limb-1", part_type="limb")
+    kept = make_session("limb-1")
+    monkeypatch.setitem(w._sessions, "old", kept)
+    assert w._session(Cookies()) == (kept, False)
+
+    gone = make_session("limb-9")  # its revision folder no longer exists
+    monkeypatch.setitem(w._sessions, "old", gone)
+    fresh = make_session("limb-2")
+    monkeypatch.setattr(w, "_new_session", lambda: fresh)
+    assert w._session(Cookies()) == (fresh, True)
+    assert "old" not in w._sessions
+
+
+def test_lower_leg_hangs_under_the_socket_for_display(workspace):
+    socket_id = cad.create_part("socket").data["revision_id"]
+    path = workspace / "lower_leg.stl"
+    w._write_lower_leg(socket_id, path)
+    data = path.read_bytes()
+    count = int.from_bytes(data[80:84], "little")
+    assert count > 0
+    import numpy as np
+
+    rows = np.frombuffer(data[84:84 + count * 50], dtype=np.dtype([("n", "<3f4"), ("v", "<9f4"), ("a", "<u2")]))
+    points = rows["v"].reshape(-1, 3)
+    # From the socket's closed end (152 mm) to the floor (342 mm), toe pointing anterior (+Y).
+    assert round(float(points[:, 2].min())) == 152 and round(float(points[:, 2].max())) == 342
+    assert points[:, 1].max() > abs(points[:, 1].min())
+    # Display only: no revision was made for it.
+    assert [m["revision_id"] for m in cad._all_meta()] == [socket_id]

@@ -229,11 +229,11 @@ def _flip(shape: cq.Shape) -> cq.Shape:
     return shape.rotate((0, 0, 0), (1, 0, 0), 180)
 
 
-def assemble(socket_shape: cq.Shape, socket_depth_mm: float, parts: dict[str, tuple[cq.Shape, dict]]) -> dict:
-    """Place adapter, pylon and foot under the socket.
+def place_lower_leg(socket_depth_mm: float, parts: dict[str, tuple[cq.Shape, dict]]) -> dict:
+    """Place adapter, pylon and foot under a socket whose closed end is at socket_depth_mm.
 
     parts maps "adapter", "pylon", "foot" to (shape, params). Raises ValueError if
-    the connectors do not match. Returns the compound and the key heights.
+    the connectors do not match. Returns the placed shapes and the floor height.
     """
     adapter_p, pylon_p, foot_p = parts["adapter"][1], parts["pylon"][1], parts["foot"][1]
     for upper, lower in (("adapter", "pylon"), ("pylon", "foot")):
@@ -258,12 +258,19 @@ def assemble(socket_shape: cq.Shape, socket_depth_mm: float, parts: dict[str, tu
     ankle_x = 0.30 * length
     pyramid_tip = heel - (heel - toe) / length * ankle_x + 8 + foot_p["connector_height_mm"]
     floor = pylon_bottom - foot_p["connector_height_mm"] + pyramid_tip
-    foot = _flip(parts["foot"][0]).translate((-ankle_x, 0, floor))
+    # The foot is built toe along +X; turn it so the toe points anterior (+Y), the socket's front.
+    foot = _flip(parts["foot"][0]).translate((-ankle_x, 0, floor)).rotate((0, 0, 0), (0, 0, 1), 90)
+    return {"adapter": adapter, "pylon": pylon, "foot": foot, "floor_mm": floor}
 
-    compound = cq.Compound.makeCompound([socket_shape, adapter, pylon, foot])
+
+def assemble(socket_shape: cq.Shape, socket_depth_mm: float, parts: dict[str, tuple[cq.Shape, dict]]) -> dict:
+    """Place adapter, pylon and foot under the socket. Returns the compound and the key heights."""
+    placed = place_lower_leg(socket_depth_mm, parts)
+    floor = placed["floor_mm"]
+    compound = cq.Compound.makeCompound([socket_shape, placed["adapter"], placed["pylon"], placed["foot"]])
     return {
         "compound": compound,
         "opening_to_floor_mm": round(floor, 2),
         "socket_end_to_floor_mm": round(floor - socket_depth_mm, 2),
-        "pylon_length_mm": pylon_p["length_mm"],
+        "pylon_length_mm": parts["pylon"][1]["length_mm"],
     }

@@ -34,7 +34,7 @@ from pathlib import Path
 import cadquery as cq
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 from agent.llm import VllmClient
 from agent.loop import Agent, Pause
@@ -163,7 +163,11 @@ def _session(request: Request) -> tuple[Session, bool]:
     sid = request.cookies.get(COOKIE)
     with _sessions_lock:
         if sid in _sessions:
-            return _sessions[sid], False
+            # A session whose limb files were deleted (workspace cleared while running)
+            # would only serve 404s; start a fresh one instead.
+            if cad._revision_dir(_sessions[sid].limb["revision_id"]).is_dir():
+                return _sessions[sid], False
+            del _sessions[sid]
         session = _new_session()
         _sessions[session.id] = session
         return session, True
@@ -875,7 +879,24 @@ def report(request: Request):
 # Files
 # ---------------------------------------------------------------------------
 
-ROLE_TYPES = {"residual_limb": "limb", "socket_shell": "socket"}
+ROLE_TYPES = {"residual_limb": "limb", "socket_shell": "socket", "lower_leg": "socket", "engraving": "socket"}
+EMPTY_STL = b"\0" * 80 + (0).to_bytes(4, "little")  # a valid binary STL with no triangles
+
+
+def _write_lower_leg(socket_id: str, path: Path) -> None:
+    """The standard adapter, pylon and foot under this socket, for display only.
+
+    Not a revision: never validated, sliced or printed. Built from prosthesis defaults
+    at the socket's depth, in the socket's design frame like view.stl.
+    """
+    from tools.cad import prosthesis
+
+    depth = float(json.loads((cad._revision_dir(socket_id) / "profile.json").read_text())["socket_depth_mm"])
+    parts = {kind: (prosthesis.build(kind, prosthesis.defaults(kind)), prosthesis.defaults(kind))
+             for kind in ("adapter", "pylon", "foot")}
+    placed = prosthesis.place_lower_leg(depth, parts)
+    leg = cq.Compound.makeCompound([placed["adapter"], placed["pylon"], placed["foot"]])
+    cq.exporters.export(leg, str(path), exportType="STL", tolerance=0.1, angularTolerance=0.15)
 
 
 @app.get("/api/files/{revision_id}/{role}.stl")
@@ -886,6 +907,17 @@ def stl_file(revision_id: str, role: str):
     if meta is None or meta["part_type"] != ROLE_TYPES[role]:
         return JSONResponse({"error": "unknown file"}, status_code=404)
     folder = cad._revision_dir(revision_id)
+    if role == "engraving":
+        # The cut-away letters, saved when a label was engraved; empty for a plain socket.
+        path = folder / "engraving.stl"
+        if not path.is_file():
+            return Response(EMPTY_STL, media_type="model/stl")
+        return FileResponse(path, media_type="model/stl", filename=f"{revision_id}-{role}.stl")
+    if role == "lower_leg":
+        view = folder / "lower_leg.stl"
+        if not view.is_file():
+            _write_lower_leg(revision_id, view)
+        return FileResponse(view, media_type="model/stl", filename=f"{revision_id}-{role}.stl")
     view = folder / "view.stl"  # design orientation; part.stl is turned for printing
     if not view.is_file():
         shape = cad.load_step_shape(folder / "part.step")

@@ -172,14 +172,18 @@ def _save_socket(base_step: Path, profile: dict, limb_profile: dict, features: l
     """
     if not features:
         return _save_revision("socket", base_step, profile, **meta)
-    shape, removed = socket_features.apply(load_step_shape(base_step), profile, limb_profile, features)
+    shape, removed, pieces = socket_features.apply(load_step_shape(base_step), profile, limb_profile, features)
     with _scratch_dir() as out:
         final = Path(out) / "part.step"
         cq.exporters.export(shape, str(final), exportType="STEP")
         revision_id = _save_revision(
             "socket", final, profile, features=features, feature_removed_mm3=removed, **meta,
         )
-    shutil.copyfile(base_step, _revision_dir(revision_id) / "base.step")
+    folder = _revision_dir(revision_id)
+    shutil.copyfile(base_step, folder / "base.step")
+    # The cut-away letters, for the viewer to highlight; never printed.
+    cq.exporters.export(cq.Compound.makeCompound(pieces), str(folder / "engraving.stl"),
+                        exportType="STL", tolerance=0.05, angularTolerance=0.1)
     return revision_id
 
 
@@ -1128,14 +1132,14 @@ def _add_socket_feature(revision_id: str, feature: dict, action: str):
             "text": {"type": "string", "description": "1-20 characters: letters, digits, spaces, . - _ # /"},
             "face": {"type": "string", "enum": list(socket_features.FACES)},
             "height_mm": {"type": "number", "description": "Centre of the text, mm below the opening."},
-            "text_height_mm": {"type": "number", "description": "Letter height, 4-20 mm. Default 8."},
-            "depth_mm": {"type": "number", "description": "Engraving depth, 0.4-1.5 mm. Default 0.8."},
+            "text_height_mm": {"type": "number", "description": "Letter height, 4-20 mm. Default 10."},
+            "depth_mm": {"type": "number", "description": "Engraving depth, 0.4-1.5 mm. Default 1.2."},
         },
         "required": ["revision_id", "text", "face"],
     },
 )
 def engrave_label(revision_id: str, text: str, face: str, height_mm: float | None = None,
-                  text_height_mm: float = 8.0, depth_mm: float = 0.8):
+                  text_height_mm: float = 10.0, depth_mm: float = 1.2):
     meta = _read_meta(revision_id)
     if meta is None or meta["part_type"] != "socket":
         return _unknown_revision(revision_id, "socket")

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Component, Suspense, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import * as THREE from "three";
 import { Canvas, useLoader } from "@react-three/fiber";
 import {
@@ -196,12 +196,37 @@ function Model({
   );
 }
 
+// A model that fails to load (for example its revision was deleted) shows a
+// message in the viewer instead of taking down the page. Keyed by url, so the
+// next revision loads normally.
+class ViewerErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="grid h-full place-items-center p-6 text-center text-sm text-muted-foreground">
+          The 3D model could not be loaded. Reload the page; if it stays empty, restart the API.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function StlViewer({
   url,
   color = "#d3ccc7",
   skin = false,
   shell = false,
   limbUrl,
+  lowerLegUrl,
+  showLowerLeg = false,
+  engravingUrl,
   showLimb = true,
   insertion = 0,
   revealInterior = false,
@@ -215,6 +240,9 @@ export function StlViewer({
   skin?: boolean;
   shell?: boolean;
   limbUrl?: string;
+  lowerLegUrl?: string;
+  showLowerLeg?: boolean;
+  engravingUrl?: string;
   showLimb?: boolean;
   insertion?: number;
   revealInterior?: boolean;
@@ -231,6 +259,7 @@ export function StlViewer({
 
   return (
     <div className="relative h-full w-full" role="img" aria-label={label}>
+      <ViewerErrorBoundary key={`${url} ${limbUrl ?? ""} ${lowerLegUrl ?? ""}`}>
       <Canvas camera={{ position: shell ? [60, 65, 320] : [0, 0, 320], fov: 35 }} dpr={[1, 2]}>
         <color attach="background" args={["#f3f2ee"]} />
         <ambientLight intensity={skin ? 0.45 : 0.7} />
@@ -240,7 +269,7 @@ export function StlViewer({
         <Suspense fallback={null}>
           {shell && limbUrl ? (
             <Bounds margin={1.25} maxDuration={0}>
-              <SocketLimbAssembly socketUrl={url} limbUrl={limbUrl} showLimb={showLimb} insertion={insertion} revealInterior={revealInterior} measuredGeometry={measuredGeometry} measurements={socketMeasurements} onSize={setInfo} />
+              <SocketLimbAssembly socketUrl={url} limbUrl={limbUrl} lowerLegUrl={lowerLegUrl} showLowerLeg={showLowerLeg} engravingUrl={engravingUrl} showLimb={showLimb} insertion={insertion} revealInterior={revealInterior} measuredGeometry={measuredGeometry} measurements={socketMeasurements} onSize={setInfo} />
             </Bounds>
           ) : (
             <Bounds fit clip observe margin={1.15}>
@@ -283,6 +312,7 @@ export function StlViewer({
           <GizmoViewport axisColors={["#b45309", "#57534e", "#334155"]} labelColor="#292524" />
         </GizmoHelper>
       </Canvas>
+      </ViewerErrorBoundary>
     </div>
   );
 }

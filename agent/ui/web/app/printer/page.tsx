@@ -6,6 +6,7 @@ import { PageHeading } from "@/components/app-shell";
 import { LayerView } from "@/components/layer-view";
 import { PrintBar } from "@/components/print-controls";
 import { PrintPanel } from "@/components/print-panel";
+import { ProsthesisPreview } from "@/components/prosthesis-preview";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -48,6 +49,9 @@ export default function PrinterPage() {
             <div className="rounded-[calc(var(--radius)-1px)] bg-background p-5">
               <PrintPanel />
             </div>
+          </section>
+          <section aria-label="Full prosthesis" className="rounded-md border bg-card p-5">
+            <ProsthesisPreview />
           </section>
           {session.started && (
             <section aria-label="Live layer view" className="rounded-md border bg-card p-5">

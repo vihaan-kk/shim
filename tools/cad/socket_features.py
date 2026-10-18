@@ -54,8 +54,9 @@ def side_wall_range(profile: dict, half_height_mm: float) -> tuple[float, float]
 
 
 def default_height(profile: dict) -> float:
+    """A third of the way down the straight wall: clear of the mid-socket section ring the viewer labels."""
     low, high = side_wall_range(profile, 0.0)
-    return round((low + high) / 2, 1)
+    return round(low + (high - low) * 0.3, 1)
 
 
 def _check_height(profile: dict, height_mm: float, half_height_mm: float, what: str) -> None:
@@ -155,17 +156,21 @@ def _cutter(feature: dict, socket_profile: dict, limb_profile: dict, base):
 
 
 def apply(base, socket_profile: dict, limb_profile: dict, features: list[dict]):
-    """Cut every feature into the base socket. Returns (shape, removed_mm3 per feature).
+    """Cut every feature into the base socket.
+
+    Returns (shape, removed_mm3 per feature, the removed material as solids for display).
 
     Raises FeatureError when a feature is out of range for this socket or cuts nothing.
     """
     if len(features) > MAX_FEATURES:
         raise FeatureError("too_many_features", f"A socket can have at most {MAX_FEATURES} features.")
-    shape, removed = base, []
+    shape, removed, pieces = base, [], []
     for index, feature in enumerate(features, 1):
         check(feature, socket_profile)
         try:
-            cut = shape.cut(_cutter(feature, socket_profile, limb_profile, shape))
+            cutter = _cutter(feature, socket_profile, limb_profile, shape)
+            cut = shape.cut(cutter)
+            pieces.append(cutter.intersect(shape))
         except Exception as exc:  # OpenCascade failures arrive as several exception types
             raise FeatureError("geometry_failed", f"Feature {index} ({describe(feature)}) could not be cut: {exc}") from exc
         volume = shape.Volume() - cut.Volume()
@@ -177,7 +182,7 @@ def apply(base, socket_profile: dict, limb_profile: dict, features: list[dict]):
             )
         shape = cut
         removed.append(round(volume, 2))
-    return shape, removed
+    return shape, removed, pieces
 
 
 def checks(final, base, features: list[dict], removed: list[float]) -> dict:

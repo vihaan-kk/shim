@@ -163,7 +163,7 @@ def test_engraved_label_survives_an_edit_and_is_checked(workspace):
     edited = cad.modify_socket("socket-2", "set_wall_thickness", 6.0)
     assert edited.ok
     socket_id = edited.data["revision_id"]
-    assert cad.inspect_part(socket_id).data["features"] == ["label 'SHIM S-2' on the front, 0.8 mm deep"]
+    assert cad.inspect_part(socket_id).data["features"] == ["label 'SHIM S-2' on the front, 1.2 mm deep"]
     assert cad.validate_part(socket_id).ok
     report = json.loads((workspace / f"revisions/{socket_id}/validation.json").read_text())
     assert report["categories"]["features"]["passed"]

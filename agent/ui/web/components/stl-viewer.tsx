@@ -14,8 +14,12 @@ import {
   OrbitControls,
 } from "@react-three/drei";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { LimbSkinMaterial } from "@/components/limb-skin-material";
-import { createLimbContour, limbSectionOffset } from "@/lib/limb-contour";
+import { SocketShellMaterial } from "@/components/socket-shell-material";
+import type { SocketValidation } from "@/lib/types";
+import { SocketLimbAssembly } from "@/components/socket-limb-assembly";
+import { createLimbContour, limbSectionOffset, limbTipScale } from "@/lib/limb-contour";
 
 // One measurement station to draw on the model: a ring at zMm from the
 // proximal (opening) end, labelled with its circumference when known.
@@ -64,17 +68,28 @@ function Model({
   url,
   color,
   skin,
+  shell,
   annotations,
   onSize,
 }: {
   url: string;
   color: string;
   skin: boolean;
+  shell: boolean;
   annotations?: ViewerAnnotations;
   onSize: (size: { length: number; width: number }) => void;
 }) {
   const geometry = useLoader(STLLoader, url);
-  const displayGeometry = useMemo(() => skin ? createLimbContour(geometry) : geometry, [geometry, skin]);
+  const displayGeometry = useMemo(() => {
+    if (skin) return createLimbContour(geometry);
+    if (shell) {
+      const copy = geometry.clone();
+      const smoothed = toCreasedNormals(copy, Math.PI / 3);
+      if (smoothed !== copy) copy.dispose();
+      return smoothed;
+    }
+    return geometry;
+  }, [geometry, skin, shell]);
 
   useEffect(() => () => {
     if (displayGeometry !== geometry) displayGeometry.dispose();
@@ -120,12 +135,15 @@ function Model({
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>
       <mesh geometry={displayGeometry}>
-        {skin ? <LimbSkinMaterial /> : <meshStandardMaterial color={color} roughness={0.75} metalness={0} />}
+        {skin ? <LimbSkinMaterial /> : shell ? <SocketShellMaterial box={box} /> : <meshStandardMaterial color={color} roughness={0.75} metalness={0} />}
       </mesh>
 
       {stations.map((station) => {
         const z = box.min.z + station.zMm;
-        const { rx, ry } = info.radiiAt(z);
+        const radii = info.radiiAt(z);
+        const scale = skin ? limbTipScale(z, box) : 1;
+        const rx = radii.rx * scale;
+        const ry = radii.ry * scale;
         const offset = skin ? limbSectionOffset(z, box) : new THREE.Vector2();
         const cx = center.x + offset.x;
         const cy = center.y + offset.y;
@@ -182,12 +200,26 @@ export function StlViewer({
   url,
   color = "#d3ccc7",
   skin = false,
+  shell = false,
+  limbUrl,
+  showLimb = true,
+  insertion = 0,
+  revealInterior = false,
+  measuredGeometry = false,
+  socketMeasurements,
   label,
   annotations,
 }: {
   url: string;
   color?: string;
   skin?: boolean;
+  shell?: boolean;
+  limbUrl?: string;
+  showLimb?: boolean;
+  insertion?: number;
+  revealInterior?: boolean;
+  measuredGeometry?: boolean;
+  socketMeasurements?: SocketValidation["measurements"];
   label: string;
   annotations?: ViewerAnnotations;
 }) {
@@ -199,18 +231,24 @@ export function StlViewer({
 
   return (
     <div className="relative h-full w-full" role="img" aria-label={label}>
-      <Canvas camera={{ position: [0, 0, 320], fov: 35 }} dpr={[1, 2]}>
+      <Canvas camera={{ position: shell ? [60, 65, 320] : [0, 0, 320], fov: 35 }} dpr={[1, 2]}>
         <color attach="background" args={["#f3f2ee"]} />
         <ambientLight intensity={skin ? 0.45 : 0.7} />
         <directionalLight position={skin ? [-140, 180, 170] : [120, 200, 160]} intensity={skin ? 1.65 : 1.1} />
         <directionalLight position={[-160, -80, -120]} intensity={0.35} />
         {skin && <directionalLight position={[160, 50, -100]} intensity={0.7} color="#ffe6ce" />}
         <Suspense fallback={null}>
-          <Bounds fit clip observe margin={1.15}>
-            <Center>
-              <Model url={url} color={color} skin={skin} annotations={annotations} onSize={setInfo} />
-            </Center>
-          </Bounds>
+          {shell && limbUrl ? (
+            <Bounds margin={1.25} maxDuration={0}>
+              <SocketLimbAssembly socketUrl={url} limbUrl={limbUrl} showLimb={showLimb} insertion={insertion} revealInterior={revealInterior} measuredGeometry={measuredGeometry} measurements={socketMeasurements} onSize={setInfo} />
+            </Bounds>
+          ) : (
+            <Bounds fit clip observe margin={1.15}>
+              <Center>
+                <Model url={url} color={color} skin={skin} shell={shell} annotations={annotations} onSize={setInfo} />
+              </Center>
+            </Bounds>
+          )}
         </Suspense>
         {info && (
           <>

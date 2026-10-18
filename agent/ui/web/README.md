@@ -62,8 +62,9 @@ The UI components are shadcn/ui in the `base-nova` style, which is built on Base
 ## Rules the page keeps
 
 - The browser never computes geometry and never sends file paths. It sends ids and displays what tools return.
-- The limb and the socket are never drawn as one object. Each has its own page and title.
+- The limb has its own page. The socket page also offers an assembly demonstration using the matching confirmed limb revision: separated-to-seated translation, optional socket transparency, and a limb visibility toggle. Both display meshes receive the same limb-relative illustrative curve, preserving the form's P/M/D section sizes and axial length. The terminal section below D has an illustrative taper applied consistently to both parts. Source meshes and backend geometry remain unchanged; this is not a wall-thickness or clinical-fit simulation. Camera framing stays fixed across these controls. This demonstrates alignment, not clinical fit or collision-free insertion.
 - Limb Confirm stays disabled while length, P or D is empty. Socket Confirm stays disabled unless the geometric checks pass.
+- Socket measurements come only from the current validation report. Missing values say "Not reported". The socket viewer defaults to measured geometry (unaltered vertex positions); disabling that control enables the illustrative contour. Depth and circumference rings appear directly on measured geometry, using backend section heights and reported outer perimeters. Screen-reader text provides the same section values. Recorded mock values are labeled. No pair clearance or overlap is inferred from socket dimensions.
 - "Approve print" is enabled only when three things hold: the printer is ready, a job is sliced, and the agent has asked for a `start_print` confirmation.
 - When the link drops, the panel keeps the last good read and labels it "Link lost". Time left shows "unknown", and no percentage is invented.
 - "Simulate link loss" exists in mock mode only. Fault injection is never something the model can call.

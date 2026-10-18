@@ -12,6 +12,8 @@ import sys
 
 import requests
 
+from agent.llm import auth_headers
+
 BASE = os.environ["VLLM_BASE_URL"].rstrip("/")
 MODEL = os.environ["MODEL_NAME"]
 TOOL = {
@@ -27,6 +29,7 @@ TOOL = {
 def ask(extra: dict) -> dict:
     r = requests.post(
         f"{BASE}/chat/completions",
+        headers=auth_headers(os.environ.get("VLLM_API_KEY", "")),
         json={
             "model": MODEL,
             "messages": [{"role": "user", "content": "Is the printer ready?"}],

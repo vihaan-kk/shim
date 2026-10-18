@@ -11,6 +11,7 @@ import type {
   Measurements,
   PreparedJob,
   PrinterStatus,
+  PrintLayers,
   PrintSnapshot,
   SocketRevision,
   SocketValidation,
@@ -51,6 +52,8 @@ export interface WorkbenchApi {
   // Printer page, polled while the page is open (README §12 print monitoring).
   getPrinterStatus(): Promise<ToolResult<PrinterStatus>>;
   getPrintSnapshot(): Promise<PrintSnapshot | null>;
+  // The started job's layers for the live layer view; null without real G-code.
+  getPrintLayers(): Promise<PrintLayers | null>;
   getReport(): Promise<Record<string, unknown>>;
   // Mock only: demo control that is never exposed to the model.
   simulateLinkLoss?(): void;
@@ -138,6 +141,7 @@ export const httpApi: WorkbenchApi = {
   },
   getPrinterStatus: () => getJson("/printer"),
   getPrintSnapshot: () => getJson("/print/snapshot"),
+  getPrintLayers: () => getJson("/print/layers"),
   getReport: () => getJson("/report"),
 };
 

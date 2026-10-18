@@ -14,15 +14,24 @@ import requests
 
 
 class VllmClient:
-    def __init__(self, base_url: str | None = None, model: str | None = None, timeout_s: int = 120):
+    def __init__(
+        self,
+        base_url: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
+        timeout_s: int = 120,
+    ):
         self.base_url = (base_url or os.environ["VLLM_BASE_URL"]).rstrip("/")
         self.model = model or os.environ["MODEL_NAME"]
+        # Set when the shared vLLM server was started with --api-key.
+        self.api_key = api_key or os.environ.get("VLLM_API_KEY", "")
         self.timeout_s = timeout_s
 
     def chat(self, messages: list[dict], tools: list[dict]) -> dict:
         """Send the conversation and tool list; return the assistant message."""
         response = requests.post(
             f"{self.base_url}/chat/completions",
+            headers=auth_headers(self.api_key),
             json={
                 "model": self.model,
                 "messages": messages,
@@ -38,6 +47,10 @@ class VllmClient:
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]
+
+
+def auth_headers(api_key: str) -> dict:
+    return {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
 
 class ScriptedLLM:

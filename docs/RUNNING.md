@@ -108,9 +108,9 @@ Open http://localhost:3000.
 
 ## Trying the flow
 
-1. **Limb page:** change a value and click **Update model**, or ask in chat, for example "make the proximal circumference 300". Then click **Confirm limb**. Building the socket takes about 20 s.
-2. **Socket page:** try "make the wall 6 mm", then "validate it", then click **Confirm socket**.
-3. **Printer page:** say "print it with the draft profile" and approve both confirmations.
+1. **Limb page:** the measurement profile is read-only. Ask in chat to change a value, for example "make the proximal circumference 300". Then click **Confirm limb**. Building the socket takes about 20 s.
+2. **Socket page:** try "make the wall 6 mm", "engrave SHIM-04 on the front", then "validate it", then click **Confirm socket**.
+3. **Printer page:** say "print it with the draft profile", or "make a 40% preview and print that" for a print of about 70 minutes, and approve both confirmations. With `FAKE_TOOLS=0` the live layer view follows the printer layer by layer.
 
 To start over, open the page in a private window, or restart the API.
 

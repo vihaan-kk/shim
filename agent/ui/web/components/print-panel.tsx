@@ -8,7 +8,7 @@ import type { PrintStep } from "@/lib/types";
 // README §12 "Print monitoring": one highlighted step, the completion bar, and
 // the OctoPrint fields. Missing fields say "not reported"; link loss, pausing
 // and errors replace the bar's caption instead of inventing a number.
-const STEPS: PrintStep[] = ["Starting", "Printing", "Pausing", "Paused", "Error", "Link lost", "Finished"];
+const STEPS: PrintStep[] = ["Starting", "Printing", "Pausing", "Paused", "Error", "Link lost", "Cancelled", "Finished"];
 
 const minutes = (s: number | null | undefined) =>
   s == null ? null : s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
@@ -110,6 +110,10 @@ export function PrintPanel() {
           value={snap.temperatures?.bed ? `${snap.temperatures.bed.actual} / ${snap.temperatures.bed.target ?? "—"} °C` : null}
         />
         <Field label="Profile" value={job ? <span className="font-mono">{job.profile_id}</span> : null} />
+        <Field
+          label="Layer"
+          value={snap.layer != null && snap.layer_count != null ? `${snap.layer} of ${snap.layer_count} · Z ${snap.layer_z?.toFixed(2)} mm` : null}
+        />
       </dl>
     </div>
   );

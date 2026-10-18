@@ -147,3 +147,43 @@ def test_inconsistent_dimensions_are_fixable():
     assert registry.call("validate_measurements", {"distal_circumference_mm": 300}).error.code == "inconsistent_taper"
     assert registry.call("validate_measurements", {"length_mm": 250}).error.code == "outside_template"
     assert registry.call("validate_measurements", {"ap_mm": 80}).error.code == "invalid_value"
+
+
+def test_engraved_label_survives_an_edit_and_is_checked(workspace):
+    cad.create_part("socket")
+    labelled = cad.engrave_label("socket-1", "SHIM S-2", "front")
+    assert labelled.ok and labelled.data["revision_id"] == "socket-2"
+    assert (workspace / "revisions/socket-2/base.step").is_file()
+
+    too_deep = cad.engrave_label("socket-1", "X", "front", depth_mm=4)
+    assert too_deep.status == "fixable" and too_deep.error.valid_range == {"depth_mm": [0.4, 1.5]}
+    on_brim = cad.engrave_label("socket-1", "X", "back", height_mm=5)
+    assert on_brim.status == "fixable" and "height_mm" in on_brim.error.valid_range
+
+    edited = cad.modify_socket("socket-2", "set_wall_thickness", 6.0)
+    assert edited.ok
+    socket_id = edited.data["revision_id"]
+    assert cad.inspect_part(socket_id).data["features"] == ["label 'SHIM S-2' on the front, 0.8 mm deep"]
+    assert cad.validate_part(socket_id).ok
+    report = json.loads((workspace / f"revisions/{socket_id}/validation.json").read_text())
+    assert report["categories"]["features"]["passed"]
+
+
+def test_preview_is_a_labelled_scaled_copy_of_a_validated_part(workspace):
+    cad.create_part("socket")
+    not_checked = cad.make_preview_print("socket-1", 50)
+    assert not_checked.status == "fixable" and not_checked.error.code == "not_validated"
+    assert cad.validate_part("socket-1").ok
+
+    too_small = cad.make_preview_print("socket-1", 15)
+    assert too_small.status == "fixable" and too_small.error.valid_range == [25, 75]
+
+    preview = cad.make_preview_print("socket-1", 40)
+    assert preview.ok and preview.data == {
+        "revision_id": "preview-1", "preview_of": "socket-1", "scale_percent": 40,
+        "not_to_size": True, "printable": True,
+    }
+    assert "NOT TO SIZE" in preview.message
+    assert "preview-1" in pt._printable_revisions()
+    listed = {r["revision_id"]: r for r in cad.list_parts().data["revisions"]}
+    assert listed["preview-1"]["not_to_size"] and listed["preview-1"]["scale_percent"] == 40

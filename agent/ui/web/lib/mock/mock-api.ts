@@ -190,6 +190,9 @@ function snapshot(): PrintSnapshot | null {
     port: "VIRTUAL",
     temperatures: { tool0: { actual: 214.8, target: 215 }, bed: { actual: 60.1, target: 60 } },
     error: null,
+    layer: null,
+    layer_count: null,
+    layer_z: null,
   };
   state.lastSnapshot = snap;
   return snap;
@@ -309,6 +312,10 @@ export const mockApi: WorkbenchApi = {
   async getPrinterStatus() {
     await sleep(100);
     return printerStatus() as unknown as ToolResult<PrinterStatus>;
+  },
+
+  async getPrintLayers() {
+    return null; // mock jobs have no G-code
   },
 
   async getPrintSnapshot() {

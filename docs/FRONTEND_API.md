@@ -70,7 +70,7 @@ The page reacts to some successful tool results. Pass their data through unchang
 | Tool result | Required `data` fields | Effect on the page |
 |---|---|---|
 | `customize_residual_limb` | `revision_id`, `parent_revision_id`, `stl_url`, and `measurements` with the changed fields | The limb viewer reloads and the profile shows the new values |
-| `modify_socket` | `socket_id`, `stl_url` | The socket viewer reloads |
+| `modify_socket`, `fit_socket_to_limb`, `engrave_label` | `socket_id`, `stl_url`, `validation` | The socket viewer reloads; the socket shows as not validated |
 | `prepare_print` / `slice` | `job_id`, `profile_id`, `estimated_seconds`, `filament_m` | Fills the print actions |
 | `start_print` | `job_id`, `verified: true` | Starts the print panel |
 
@@ -78,7 +78,7 @@ The page reacts to some successful tool results. Pass their data through unchang
 
 | Method and path | Body / returns |
 |---|---|
-| `POST /api/measurements` | Body: `Measurements` (`lib/types.ts`), with all required and optional fields. Runs `validate_measurements` and then the customize step. Returns `{ revision: LimbRevision }`. A rejection uses the `ToolResult` envelope with HTTP 422. |
+| `POST /api/measurements` | Body: `Measurements` (`lib/types.ts`), with all required and optional fields. Runs `validate_measurements` and then the customize step. Returns `{ revision: LimbRevision }`. A rejection uses the `ToolResult` envelope with HTTP 422. The page no longer calls it: the profile is read-only and values change through the agent. |
 | `POST /api/limb/confirm` | Body: `{ "revision_id": "r1" }`. Builds the demonstration socket for that revision. Returns `{ socket: SocketRevision, validation: SocketValidation }`. |
 
 `SocketValidation` is the return dict of `validate_socket` (`tools/cad/validate_socket.py`), unchanged.
@@ -97,14 +97,16 @@ These endpoints are polled about every 2 seconds while the page is open, includi
 |---|---|---|
 | `GET /api/printer` | `ToolResult` with `PrinterStatus` data. Used for readiness. | `get_printer_status` |
 | `GET /api/print/snapshot` | `PrintSnapshot`, or `null` before a verified start | The server-side poll in README §12 "Print monitoring" |
+| `GET /api/print/layers` | `PrintLayers`: each layer's `z` and outer-wall paths, or `null` without the job's G-code (fake printer) | `tools/printer/gcode_layers.py` |
 | `GET /api/report` | The fabrication report JSON, including the last observed step | The audit log |
 
 `PrintSnapshot` (`lib/types.ts`) holds:
-- one `step`: Starting, Printing, Pausing, Paused, Error, Link lost or Finished, chosen by the rules in README §12;
+- one `step`: Starting, Printing, Pausing, Paused, Error, Link lost, Cancelled or Finished, chosen by the rules in README §12;
 - `completion`, exactly as OctoPrint returned it (README marks its scale as unresolved);
 - `filepos`, `print_time_s` and `print_time_left_s` (`null` when OctoPrint omits it);
 - `file`, `filament_mm` and `port`;
 - `temperatures`, when present;
+- `layer`, `layer_count` and `layer_z`: the layer containing `filepos` in the job's own G-code, or `null` (fake printer, or OctoPrint printing another file);
 - `observed_at` and `stale`.
 
 When a poll fails, return the last good snapshot with `step: "Link lost"` and `stale: true`. Never estimate a new percentage.
@@ -117,7 +119,7 @@ These endpoints read only. They never call `start_print`, never change the job l
 
 ## How the server fills the gaps listed earlier
 
-1. **CAD tools.** `tools/cad/tools.py` registers the CAD library as agent tools (`create_part`, `inspect_part`, `validate_measurements`, `customize_residual_limb`, `fit_socket_to_limb`, `modify_socket`, `check_fit`, `validate_part`, plus the adapter, pylon and foot tools). Each returns the `ToolResult` envelope.
+1. **CAD tools.** `tools/cad/tools.py` registers the CAD library as agent tools (`create_part`, `inspect_part`, `validate_measurements`, `customize_residual_limb`, `fit_socket_to_limb`, `modify_socket`, `check_fit`, `validate_part`, `engrave_label`, `make_preview_print`, plus the adapter, pylon and foot tools). A scaled preview (`preview-N`) of the confirmed socket may be printed; its confirmation text starts with "PREVIEW at N%, NOT TO SIZE". Each returns the `ToolResult` envelope.
 2. **Limb measurements.** `GET /api/session` returns length, P and D filled with the standard limb's values and the optional fields empty. `POST /api/measurements` sends only the values that differ from those defaults to `validate_measurements`, then `customize_residual_limb`. `ap_depth_mm` / `ml_width_mm` map to the tools' `ap_mm` / `ml_mm`; `side: "template"` means no side.
 3. **STL files.** `GET /api/files/{id}/{role}.stl` writes `view.stl` from the revision's STEP on first request, in the design orientation. (The print STL, `part.stl`, is turned opening-up and is not served.)
 4. **Socket validation on the page.** A socket made by `modify_socket` or `fit_socket_to_limb` comes back with `data.validation` set to "not validated" (no categories). `validate_part` results carry the full `validate_socket` report in `data.validation`. `POST /api/socket/confirm` returns 409 unless the current socket passed.

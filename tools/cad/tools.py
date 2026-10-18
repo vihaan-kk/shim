@@ -19,6 +19,7 @@ Reference files in data/ are never written; the library refuses that anyway.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import shutil
@@ -29,7 +30,8 @@ from pathlib import Path
 import cadquery as cq
 
 from common.result import fatal, fixable, success
-from tools.cad import prosthesis, questionnaire
+from tools.cad import prosthesis, questionnaire, socket_features
+from tools.cad.socket_features import FeatureError
 from tools.cad.generate_limb import (
     PROFILE_PATH,
     REFERENCE_STEP,
@@ -122,7 +124,7 @@ def _scratch_dir():
 
 def _read_meta(revision_id: str) -> dict | None:
     """Metadata for a CAD revision, or None if it does not exist or is not a CAD revision."""
-    if not re.fullmatch(r"(socket|limb|adapter|pylon|foot|assembly)-\d+", revision_id or ""):
+    if not re.fullmatch(r"(socket|limb|adapter|pylon|foot|assembly|preview)-\d+", revision_id or ""):
         return None
     path = _revision_dir(revision_id) / "meta.json"
     if not path.is_file():
@@ -153,6 +155,41 @@ def _save_revision(part_type: str, step_src: Path, profile: dict, **meta) -> str
     record = {"revision_id": revision_id, "part_type": part_type, **meta}
     (folder / "meta.json").write_text(json.dumps(record, indent=2) + "\n")
     return revision_id
+
+
+def _base_step(revision_id: str) -> Path:
+    """The library's own solid for a revision: base.step when features were cut, else part.step."""
+    folder = _revision_dir(revision_id)
+    base = folder / "base.step"
+    return base if base.is_file() else folder / "part.step"
+
+
+def _save_socket(base_step: Path, profile: dict, limb_profile: dict, features: list[dict], **meta) -> str:
+    """Save a socket revision, cutting its features into the library's solid.
+
+    With features, the revision keeps the library solid as base.step and the cut solid
+    as part.step. Raises FeatureError when a feature does not fit this socket.
+    """
+    if not features:
+        return _save_revision("socket", base_step, profile, **meta)
+    shape, removed = socket_features.apply(load_step_shape(base_step), profile, limb_profile, features)
+    with _scratch_dir() as out:
+        final = Path(out) / "part.step"
+        cq.exporters.export(shape, str(final), exportType="STEP")
+        revision_id = _save_revision(
+            "socket", final, profile, features=features, feature_removed_mm3=removed, **meta,
+        )
+    shutil.copyfile(base_step, _revision_dir(revision_id) / "base.step")
+    return revision_id
+
+
+def _feature_refused(exc: FeatureError, action: str):
+    return fixable(
+        code=exc.code,
+        reason=exc.reason,
+        message=f"{action} was refused. Use values in the valid range, or ask the user.",
+        valid_range=exc.valid_range,
+    )
 
 
 def _save_component(part_type: str, params: dict, **meta) -> str:
@@ -280,6 +317,12 @@ def list_parts():
         }
         if m["part_type"] == "socket":
             entry["fitted_to_limb"] = m.get("limb_revision_id") or "standard limb"
+            if m.get("features"):
+                entry["features"] = [socket_features.describe(f) for f in m["features"]]
+        if m["part_type"] == "preview":
+            entry["preview_of"] = m["preview_of"]
+            entry["scale_percent"] = m["scale_percent"]
+            entry["not_to_size"] = True
         revisions.append(entry)
     return success(
         f"{len(revisions)} revision(s). Standard parts: {', '.join(PART_TYPES)}.",
@@ -350,8 +393,16 @@ def inspect_part(revision_id: str):
         measured = {"ok": True}
     elif meta["part_type"] == "socket":
         limb_profile = load_profile(_limb_profile_path(meta.get("limb_revision_id")))
-        measured = measure_socket(folder / "part.step", profile, limb_profile)
+        measured = measure_socket(_base_step(revision_id), profile, limb_profile)
         summary = _socket_summary(measured)
+        if meta.get("features"):
+            summary["features"] = [socket_features.describe(f) for f in meta["features"]]
+    elif meta["part_type"] == "preview":
+        return success(
+            f"{revision_id} is a {meta['scale_percent']}% preview of {meta['preview_of']}, NOT TO SIZE.",
+            {"revision_id": revision_id, "part_type": "preview", "preview_of": meta["preview_of"],
+             "scale_percent": meta["scale_percent"], "not_to_size": True},
+        )
     else:
         measured = measure_limb(folder / "part.step", profile)
         summary = _limb_summary(measured)
@@ -422,11 +473,15 @@ def modify_socket(revision_id: str, operation: str, value_mm: float, section_id:
         if not report.get("ok"):
             return _library_failure(report, f"{operation} on {revision_id}")
         profile = json.loads(Path(report["files"]["profile"]).read_text())
-        new_id = _save_revision(
-            "socket", Path(report["files"]["step"]), profile,
-            made_by=f"modify_socket {operation}={value_mm}", parent=revision_id,
-            limb_revision_id=meta.get("limb_revision_id"),
-        )
+        limb_profile = load_profile(_limb_profile_path(meta.get("limb_revision_id")))
+        try:
+            new_id = _save_socket(
+                Path(report["files"]["step"]), profile, limb_profile, meta.get("features") or [],
+                made_by=f"modify_socket {operation}={value_mm}", parent=revision_id,
+                limb_revision_id=meta.get("limb_revision_id"),
+            )
+        except FeatureError as exc:
+            return _feature_refused(exc, f"{operation} on {revision_id} (its label no longer fits)")
     changes = {
         name: {"before": _r(c.get("before")), "after": _r(c.get("after"))}
         for name, c in (report.get("changes") or {}).items()
@@ -516,7 +571,7 @@ def check_fit(socket_revision_id: str, limb_revision_id: str):
         comparison = compare_limb_socket({
             "limb_step": str(limb_dir / "part.step"),
             "limb_profile_path": str(limb_dir / "profile.json"),
-            "socket_step": str(socket_dir / "part.step"),
+            "socket_step": str(_base_step(socket_revision_id)),
             "socket_profile_path": str(socket_dir / "profile.json"),
             "alignment_mode": "shared_frame",
         })
@@ -610,11 +665,14 @@ def fit_socket_to_limb(socket_revision_id: str, limb_revision_id: str):
     with _scratch_dir() as out:
         step = Path(out) / "part.step"
         export_socket(shape, step)
-        new_id = _save_revision(
-            "socket", step, profile,
-            made_by=f"fit_socket_to_limb {limb_revision_id}", parent=socket_revision_id,
-            limb_revision_id=limb_revision_id,
-        )
+        try:
+            new_id = _save_socket(
+                step, profile, limb_profile, socket_meta.get("features") or [],
+                made_by=f"fit_socket_to_limb {limb_revision_id}", parent=socket_revision_id,
+                limb_revision_id=limb_revision_id,
+            )
+        except FeatureError as exc:
+            return _feature_refused(exc, f"Fitting {socket_revision_id} to {limb_revision_id} (its label no longer fits)")
     depth_note = (
         f" Depth changed {old_depth:g} -> {profile['socket_depth_mm']:g} mm to follow the limb length."
         if length_change else ""
@@ -952,6 +1010,12 @@ def validate_part(revision_id: str):
     meta = _read_meta(revision_id)
     if meta is None:
         return _unknown_revision(revision_id)
+    if meta["part_type"] == "preview":
+        return success(
+            f"{revision_id} was checked when make_preview_print made it; it is a "
+            f"{meta['scale_percent']}% copy of {meta['preview_of']}, NOT TO SIZE.",
+            {"revision_id": revision_id, "validated": True, "printable": True, "not_to_size": True},
+        )
     if meta["part_type"] == "assembly":
         return fixable(
             code="assembly_not_printable",
@@ -970,8 +1034,21 @@ def validate_part(revision_id: str):
     elif meta["part_type"] == "socket":
         limb_profile = load_profile(_limb_profile_path(meta.get("limb_revision_id")))
         _export_socket_for_printing(shape, stl)
+        # The library checks its own solid; a distal vent would fail its closed-end check.
+        base_step = _base_step(revision_id)
+        base = shape if base_step == step else load_step_shape(base_step)
         with _socket_limb_reference(meta.get("limb_revision_id")):
-            report = validate_socket(shape, profile, limb_profile, step_path=step, stl_path=stl)
+            report = validate_socket(base, profile, limb_profile, step_path=base_step, stl_path=stl)
+        if meta.get("features"):
+            category = socket_features.checks(shape, base, meta["features"], meta.get("feature_removed_mm3") or [])
+            report["categories"]["features"] = category
+            if not category["passed"]:
+                report["passed"] = False
+                failed = [c for c in category["checks"] if not c["passed"]]
+                report["error"] = report.get("error") or {
+                    "code": "invalid_geometry", "message": "A cut feature failed its check",
+                    "details": {"checks": failed},
+                }
     else:
         export_solid(shape, folder / "check.step", stl)
         (folder / "check.step").unlink(missing_ok=True)
@@ -1000,4 +1077,165 @@ def validate_part(revision_id: str):
     return success(
         f"{revision_id} passed the geometry checks and is ready to print. {DISCLAIMER}",
         {"revision_id": revision_id, "validated": True, "printable": True},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Labels engraved into a socket, and scaled previews
+# ---------------------------------------------------------------------------
+
+
+def _add_socket_feature(revision_id: str, feature: dict, action: str):
+    """Make a new socket revision with one more feature cut into it."""
+    meta = _read_meta(revision_id)
+    if meta is None or meta["part_type"] != "socket":
+        return _unknown_revision(revision_id, "socket")
+    folder = _revision_dir(revision_id)
+    profile = json.loads((folder / "profile.json").read_text())
+    limb_profile = load_profile(_limb_profile_path(meta.get("limb_revision_id")))
+    features = [*(meta.get("features") or []), feature]
+    try:
+        socket_features.check(feature, profile)  # range errors before any geometry work
+        new_id = _save_socket(
+            _base_step(revision_id), profile, limb_profile, features,
+            made_by=f"{action} {socket_features.describe(feature)}", parent=revision_id,
+            limb_revision_id=meta.get("limb_revision_id"),
+        )
+    except FeatureError as exc:
+        return _feature_refused(exc, f"{action} on {revision_id}")
+    return success(
+        f"Created {new_id} from {revision_id} with a {socket_features.describe(feature)}. "
+        "It is not validated yet.",
+        {"revision_id": new_id, "parent": revision_id, "feature": feature,
+         "features": [socket_features.describe(f) for f in features]},
+    )
+
+
+@tool(
+    name="engrave_label",
+    description=(
+        "Engrave text into the outer wall of a socket revision, for example its revision id "
+        "or a date, and save the result as a new revision. face is front, back, left or "
+        "right (left and right as seen from the front). height_mm is how far below the "
+        "opening the centre of the text sits; leave it out for the middle of the wall. "
+        "The text keeps through later socket edits. Refused if the text is too wide or deep "
+        "for the wall; the result gives the valid range."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "revision_id": {"type": "string", "description": "Socket revision to engrave."},
+            "text": {"type": "string", "description": "1-20 characters: letters, digits, spaces, . - _ # /"},
+            "face": {"type": "string", "enum": list(socket_features.FACES)},
+            "height_mm": {"type": "number", "description": "Centre of the text, mm below the opening."},
+            "text_height_mm": {"type": "number", "description": "Letter height, 4-20 mm. Default 8."},
+            "depth_mm": {"type": "number", "description": "Engraving depth, 0.4-1.5 mm. Default 0.8."},
+        },
+        "required": ["revision_id", "text", "face"],
+    },
+)
+def engrave_label(revision_id: str, text: str, face: str, height_mm: float | None = None,
+                  text_height_mm: float = 8.0, depth_mm: float = 0.8):
+    meta = _read_meta(revision_id)
+    if meta is None or meta["part_type"] != "socket":
+        return _unknown_revision(revision_id, "socket")
+    if height_mm is None:
+        height_mm = socket_features.default_height(json.loads((_revision_dir(revision_id) / "profile.json").read_text()))
+    feature = {"type": "label", "text": text.strip(), "face": face, "height_mm": float(height_mm),
+               "text_height_mm": float(text_height_mm), "depth_mm": float(depth_mm)}
+    return _add_socket_feature(revision_id, feature, "engrave_label")
+
+
+PREVIEW_SCALE_PERCENT = (25, 75)
+PREVIEW_MIN_WALL_MM = 1.2  # three 0.4 mm nozzle widths
+
+
+def _thinnest_wall_mm(meta: dict, profile: dict) -> float | None:
+    if meta["part_type"] == "socket":
+        extras = [v for v in (profile.get("section_wall_extra_mm") or {}).values() if v < 0]
+        return float(profile["nominal_wall_thickness_mm"]) + min(extras, default=0.0)
+    if meta["part_type"] == "pylon":
+        return float(profile["wall_mm"])
+    return None
+
+
+@tool(
+    name="make_preview_print",
+    description=(
+        "Make a scaled-down preview of a validated part for a quick test print, as a new "
+        "revision such as preview-1. It is NOT TO SIZE: only use it when the user asks for a "
+        "small, test or preview print, and always tell them the scale. scale_percent is 25 to "
+        "75. The preview is ready to print with prepare_print; the full-size part is unchanged."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "revision_id": {"type": "string", "description": "A part that passed validate_part."},
+            "scale_percent": {"type": "number", "description": "25 to 75."},
+        },
+        "required": ["revision_id", "scale_percent"],
+    },
+)
+def make_preview_print(revision_id: str, scale_percent: float):
+    meta = _read_meta(revision_id)
+    if meta is None:
+        return _unknown_revision(revision_id)
+    if meta["part_type"] in ("assembly", "preview"):
+        return fixable(
+            code="not_previewable",
+            reason=f"{revision_id} is {'an assembly' if meta['part_type'] == 'assembly' else 'already a preview'}.",
+            message="Make a preview of one full-size part.",
+        )
+    folder = _revision_dir(revision_id)
+    if not (folder / "validated").exists():
+        return fixable(
+            code="not_validated",
+            reason=f"{revision_id} has not passed validate_part; a preview is only made of a checked part.",
+            message=f"Call validate_part on {revision_id} first.",
+        )
+    low, high = PREVIEW_SCALE_PERCENT
+    if not low <= scale_percent <= high:
+        return fixable(
+            code="out_of_range", reason=f"scale_percent must be {low} to {high}.",
+            message="Ask the user which scale they want.", valid_range=[low, high],
+        )
+    profile = json.loads((folder / "profile.json").read_text())
+    factor = scale_percent / 100
+    wall = _thinnest_wall_mm(meta, profile)
+    if wall is not None and wall * factor < PREVIEW_MIN_WALL_MM:
+        smallest = math.ceil(PREVIEW_MIN_WALL_MM / wall * 100)
+        return fixable(
+            code="wall_too_thin",
+            reason=f"At {scale_percent:g}% the {wall:g} mm wall would be {wall * factor:.2f} mm; "
+                   f"a print needs at least {PREVIEW_MIN_WALL_MM:g} mm.",
+            message="Ask the user for a larger scale.",
+            valid_range=[max(low, smallest), high],
+        )
+    shape = load_step_shape(folder / "part.step").scale(factor)
+    if not shape.isValid() or len(shape.Solids()) != 1:
+        return fatal(code="geometry_failed", reason="The scaled part is not one valid solid.",
+                     message="Tell the user the preview could not be made.")
+    with _scratch_dir() as out:
+        step = Path(out) / "part.step"
+        cq.exporters.export(shape, str(step), exportType="STEP")
+        new_id = _save_revision(
+            "preview", step, {"preview_of": revision_id, "scale_percent": scale_percent},
+            made_by=f"make_preview_print {scale_percent:g}%", parent=revision_id,
+            preview_of=revision_id, scale_percent=scale_percent, source_part_type=meta["part_type"],
+        )
+    new_folder = _revision_dir(new_id)
+    stl = new_folder / "part.stl"
+    if meta["part_type"] == "socket":
+        _export_socket_for_printing(shape, stl)
+    else:
+        cq.exporters.export(shape, str(stl), exportType="STL", tolerance=0.05, angularTolerance=0.1)
+    (new_folder / "validated").write_text(
+        f"Written by make_preview_print: a {scale_percent:g}% copy of {revision_id}, which passed "
+        "validate_part. NOT TO SIZE.\n"
+    )
+    return success(
+        f"Created {new_id}: a {scale_percent:g}% preview of {revision_id}, NOT TO SIZE. Tell the user "
+        f"the scale; it is ready for prepare_print. {revision_id} itself is unchanged. {DISCLAIMER}",
+        {"revision_id": new_id, "preview_of": revision_id, "scale_percent": scale_percent,
+         "not_to_size": True, "printable": True},
     )

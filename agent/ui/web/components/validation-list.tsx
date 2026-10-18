@@ -9,6 +9,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   dimensions: "Geometric check: dimensions",
   structure: "Geometric check: structure",
   reference_integrity: "Geometric check: reference integrity",
+  features: "Geometric check: engraved label",
 };
 
 // Renders validate_socket output. Every row is named as a geometric check,

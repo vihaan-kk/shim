@@ -1186,6 +1186,7 @@ The current step is one label, chosen from printer flags first and from `job.sta
 | Paused | `flags.paused`, or `state` text `Paused`. |
 | Error | `flags.error`, `flags.closedOrError`, or a state such as `Error` or `Offline after error`. The documented state list is not exhaustive. |
 | Link lost | The poll failed. The phase moves to `unknown`. |
+| Cancelled | `flags.cancelling`, a successful `cancel_print` for this job, or printing flags now false with `progress.completion` below 100. A stopped job is never shown as finished. |
 | Finished | The ledger has `verified_printing` for this job, printing flags are now false, and no error flag is set. |
 
 The panel highlights that one step. A completion bar uses `progress.completion` beside the file position. Pausing, error, and link loss replace the bar's caption. They do not invent a percentage.

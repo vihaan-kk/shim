@@ -15,6 +15,7 @@ import type {
   Pause,
   PreparedJob,
   PrinterStatus,
+  PrintLayers,
   PrintSnapshot,
   SocketValidation,
   ToolResult,
@@ -45,8 +46,6 @@ interface Session {
   measurements: Measurements;
   setMeasurements: (m: Measurements) => void;
   limb: LimbRevision | null;
-  applying: boolean;
-  applyMeasurements: () => Promise<void>;
   requiredFilled: boolean;
   confirmingLimb: boolean;
   confirmLimb: () => Promise<boolean>;
@@ -69,6 +68,7 @@ interface Session {
   job: PreparedJob | null;
   started: boolean;
   snapshot: PrintSnapshot | null;
+  layers: PrintLayers | null;
   downloadReport: () => Promise<void>;
 }
 
@@ -85,7 +85,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [limb, setLimb] = useState<LimbRevision | null>(null);
-  const [applying, setApplying] = useState(false);
   const [confirmingLimb, setConfirmingLimb] = useState(false);
   const [socket, setSocket] = useState<SocketBundle | null>(null);
   const [confirmingSocket, setConfirmingSocket] = useState(false);
@@ -102,6 +101,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [job, setJob] = useState<PreparedJob | null>(null);
   const [started, setStarted] = useState(false);
   const [snapshot, setSnapshot] = useState<PrintSnapshot | null>(null);
+  const [layers, setLayers] = useState<PrintLayers | null>(null);
+
+  // The started job's layer paths, fetched once per job for the live layer view.
+  const jobId = job?.job_id;
+  useEffect(() => {
+    if (!started || !jobId) return;
+    let alive = true;
+    api
+      .getPrintLayers()
+      .then((data) => alive && setLayers(data))
+      .catch(() => alive && setLayers(null));
+    return () => {
+      alive = false;
+    };
+  }, [started, jobId]);
 
   // The server is the source of truth; this applies its session snapshot.
   const applyServerSession = useCallback((s: Awaited<ReturnType<typeof api.getSession>>) => {
@@ -179,8 +193,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       });
       if (data.measurements) setMeasurements((m) => ({ ...m, ...(data.measurements as Partial<Measurements>) }));
     }
-    // fit_socket_to_limb also makes a new socket revision (e.g. after a limb change in chat).
-    if ((name === "modify_socket" || name === "fit_socket_to_limb") && data.socket_id) {
+    // fit_socket_to_limb and engrave_label also make a new socket revision.
+    if ((name === "modify_socket" || name === "fit_socket_to_limb" || name === "engrave_label") && data.socket_id) {
       // A new socket revision has not been checked yet; the server sends that state.
       setSocket((s) =>
         s
@@ -274,18 +288,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [runTurn],
   );
 
-  const applyMeasurements = useCallback(async () => {
-    setApplying(true);
-    try {
-      const { revision } = await api.applyMeasurements(measurements);
-      setLimb(revision);
-    } catch (error) {
-      setItems((prev) => [...prev, { id: newId(), role: "error", text: (error as Error).message }]);
-    } finally {
-      setApplying(false);
-    }
-  }, [measurements]);
-
   const confirmLimb = useCallback(async () => {
     if (!requiredFilled || !limb) return false;
     setConfirmingLimb(true);
@@ -331,8 +333,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       measurements,
       setMeasurements,
       limb,
-      applying,
-      applyMeasurements,
       requiredFilled,
       confirmingLimb,
       confirmLimb,
@@ -352,6 +352,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       job,
       started,
       snapshot,
+      layers,
       downloadReport,
     }),
     [
@@ -359,8 +360,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       loadError,
       measurements,
       limb,
-      applying,
-      applyMeasurements,
       requiredFilled,
       confirmingLimb,
       confirmLimb,
@@ -378,6 +377,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       job,
       started,
       snapshot,
+      layers,
       downloadReport,
     ],
   );

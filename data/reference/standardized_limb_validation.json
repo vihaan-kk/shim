@@ -294,8 +294,8 @@
     }
   },
   "files": {
-    "step": "/Users/yutiangong/Desktop/shim-hackathon/shim/data/reference/standardized_limb.step",
-    "stl": "/Users/yutiangong/Desktop/shim-hackathon/shim/data/reference/standardized_limb.stl"
+    "step": "/Users/vihaankerekatte/Developer/shim/data/reference/standardized_limb.step",
+    "stl": "/Users/vihaankerekatte/Developer/shim/data/reference/standardized_limb.stl"
   },
   "statement": "Synthetic demonstration solid. Measurements below are CAD section lengths, not anatomical or clinical measurements."
 }

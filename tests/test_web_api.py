@@ -123,3 +123,22 @@ def test_a_stopped_print_shows_cancelled_not_finished():
     by_agent.job = {"job_id": "job_2", "revision_id": "socket-2"}
     w._enrich(by_agent, "cancel_print", {"status": "success", "data": {"job_id": "job_2", "state": "cancelled"}})
     assert w._step({"operational": True}, "Operational", by_agent, None) == "Cancelled"
+
+
+def test_sockets_are_fitted_to_the_current_limb_only():
+    session = make_session("limb-50")
+    stale = w._stage_guard(session, "fit_socket_to_limb", {"socket_revision_id": "socket-36", "limb_revision_id": "limb-49"})
+    assert stale.status == "fixable" and stale.error.code == "not_current_limb"
+    assert stale.error.valid_range == ["limb-50"]
+    assert w._stage_guard(session, "fit_socket_to_limb", {"socket_revision_id": "socket-36", "limb_revision_id": "limb-50"}) is None
+    assert w._stage_guard(session, "check_fit", {"socket_revision_id": "socket-36", "limb_revision_id": "limb-49"}).status == "fixable"
+
+
+def test_each_turn_names_the_sessions_own_parts():
+    session = confirmed_session()
+    session.measurements = {"length_mm": 140, "proximal_circumference_mm": 287.86, "mid_circumference_mm": None,
+                            "distal_circumference_mm": 257.86}
+    note = w._state_note(session)
+    assert note.startswith("[workbench state] Current limb limb-1 (length 140 mm, P 287.86 mm, D 257.86 mm)")
+    assert "current socket socket-2 (built for limb-1, confirmed)" in note
+    assert "no socket yet" in w._state_note(make_session())

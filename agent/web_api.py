@@ -230,6 +230,19 @@ def _stage_guard(session: Session, name: str, args: dict):
     socket (built for the current limb) can be prepared, sliced or printed,
     and a job that has already started can never be started or re-confirmed.
     """
+    # A socket is built and checked against the session's current limb only. Older limb
+    # revisions on disk (an earlier session's, or before an edit) are not the patient's limb now.
+    current_limb = session.limb["revision_id"]
+    if name in ("fit_socket_to_limb", "check_fit") and args.get("limb_revision_id") not in (None, current_limb):
+        return fixable(
+            code="not_current_limb",
+            reason=f"The workbench's current limb is {current_limb}; {args['limb_revision_id']} is not it.",
+            message=(
+                f"Call {name} again with limb_revision_id {current_limb}, the current limb. Do not "
+                "change the limb to match another revision; only change it when the user asks."
+            ),
+            valid_range=[current_limb],
+        )
     if name == "create_part" and args.get("part_type") in OFF_FLOW_PARTS:
         return fatal(
             code="off_flow",
@@ -387,6 +400,35 @@ def _not_validated(socket_id: str) -> dict:
     }
 
 
+def _socket_measurements(socket_id: str) -> dict | None:
+    """Measurements of a socket revision for the 3D labels, in validate_socket's shape.
+
+    Measuring is not validating: the revision still shows as not validated, but the
+    viewer keeps its section rings and labels. None if the measurement fails.
+    """
+    from tools.cad.measure_socket import measure_socket
+    from tools.cad.generate_limb import load_profile
+
+    meta = cad._read_meta(socket_id)
+    if meta is None:
+        return None
+    try:
+        profile = json.loads((cad._revision_dir(socket_id) / "profile.json").read_text())
+        limb = load_profile(cad._limb_profile_path(meta.get("limb_revision_id")))
+        measured = measure_socket(cad._base_step(socket_id), profile, limb)
+    except Exception:
+        return None
+    if not measured.get("ok"):
+        return None
+    keys = ("depth_mm", "volume_mm3", "proximal_opening", "wall_thickness_samples", "distal_end", "cavity")
+    sections = ("id", "z_mm", "status", "inner_perimeter_mm", "outer_perimeter_mm", "ml_wall_thickness_mm", "ap_wall_thickness_mm")
+    return {
+        "units": "mm",
+        **{k: measured[k] for k in keys},
+        "sections": [{k: row[k] for k in sections} for row in measured["sections"]],
+    }
+
+
 def _enrich(session: Session, name: str, result: dict) -> dict:
     """Add the fields the page needs to a tool result, and track session state."""
     data = dict(result.get("data") or {})
@@ -417,6 +459,9 @@ def _enrich(session: Session, name: str, result: dict) -> dict:
         data["socket_id"] = sid
         data["stl_url"] = _stl_url(sid, "socket_shell")
         data["validation"] = _not_validated(sid)  # a new revision has no checks yet
+        measurements = _socket_measurements(sid)
+        if measurements:
+            data["validation"]["measurements"] = measurements
         # Record which limb this revision was built for, or the stage gate reads
         # a fresh socket as stale and rebuilds it. The revision's meta is the
         # source (modify_socket inherits it from its parent; None means the
@@ -504,7 +549,13 @@ async def chat(request: Request):
     if session.pending:
         return _respond(session, is_new, _conflict("Answer the pending question or confirmation first."))
     text = str(body.get("text", "")).strip()
-    return _respond(session, is_new, _turn(session, lambda: session.agent.send(text)))
+
+    def run():
+        # Every request starts from the session's real state (see _state_note).
+        session.agent.messages.append({"role": "user", "content": _state_note(session)})
+        return session.agent.send(text)
+
+    return _respond(session, is_new, _turn(session, run))
 
 
 @app.post("/api/answer")
@@ -548,6 +599,28 @@ def _form_edits(form: dict) -> dict:
             continue
         edits[tool_name] = value
     return edits
+
+
+def _state_note(session: Session) -> str:
+    """The session's current parts, so the model never picks another session's revisions."""
+    m = session.measurements
+    dims = ", ".join(
+        f"{label} {m[key]:g} mm"
+        for key, label in (("length_mm", "length"), ("proximal_circumference_mm", "P"),
+                           ("mid_circumference_mm", "M"), ("distal_circumference_mm", "D"))
+        if m.get(key) is not None
+    )
+    socket = (session.socket or {}).get("socket") or {}
+    if socket.get("socket_id"):
+        status = "confirmed" if session.socket_confirmed else (
+            "validated" if session.socket["validation"].get("passed") else "not validated")
+        socket_text = f"current socket {socket['socket_id']} (built for {socket.get('limb_revision_id')}, {status})"
+    else:
+        socket_text = "no socket yet"
+    return (
+        f"[workbench state] Current limb {session.limb['revision_id']} ({dims}); {socket_text}. "
+        "Use these ids. Other revisions in list_parts are earlier work, not this patient's parts."
+    )
 
 
 def _tell_agent(session: Session, text: str) -> None:

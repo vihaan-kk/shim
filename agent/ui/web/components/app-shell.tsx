@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="text-lg">
             Shim
           </Link>
-          {pathname === "/" ? <Link href="/limb" className="rounded-full border px-4 py-2 text-sm hover:bg-muted">Open workbench ↗</Link> : <nav aria-label="Session steps" className="order-3 flex w-full gap-1 sm:order-none sm:w-auto">
+          {pathname === "/login" ? <span /> : pathname === "/" ? <Link href="/limb" className="rounded-full border px-4 py-2 text-sm hover:bg-muted">Open workbench ↗</Link> : <nav aria-label="Session steps" className="order-3 flex w-full gap-1 sm:order-none sm:w-auto">
             {STEPS.map((step, i) => {
               const active = pathname === step.href;
               const className = cn(

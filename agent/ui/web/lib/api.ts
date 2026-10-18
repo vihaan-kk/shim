@@ -38,6 +38,8 @@ export interface SessionSnapshot {
 export interface WorkbenchApi {
   readonly isMock: boolean;
   getSession(): Promise<SessionSnapshot>;
+  // Site login on the hosted demo; throws with the server's reason when refused.
+  login(password: string): Promise<void>;
   // Agent turns. Each yields tool_call / tool_result events, then one pause.
   sendMessage(text: string): AsyncIterable<AgentEvent>;
   answer(text: string): AsyncIterable<AgentEvent>;
@@ -125,6 +127,9 @@ async function getJson<T>(path: string): Promise<T> {
 export const httpApi: WorkbenchApi = {
   isMock: false,
   getSession: () => getJson("/session"),
+  login: async (password) => {
+    await postJson("/login", { password });
+  },
   async *sendMessage(text) {
     yield* readEventStream(await post("/chat", { text }));
   },

@@ -1,11 +1,11 @@
 # Frontend API contract
 
-This is the HTTP layer the web page (`agent/ui/web`) expects for the three-page flow in README §3 and §13: residual limb, then socket, then printer. **It is built** in `agent/web_api.py`. Start it with `uv run uvicorn agent.web_api:app --port 8001` (`FAKE_TOOLS=1` uses the fake printer), then run the page with `NEXT_PUBLIC_USE_MOCK=0` (the `api` and `web-real-api` entries in `.claude/launch.json`). Without it the page runs on mock data.
+This is the HTTP layer the web page (`agent/ui/web`) expects for the three-page flow in [README_LONG](README_LONG.md) §3 and §13: residual limb, then socket, then printer. **It is built** in `agent/web_api.py`. Start it with `uv run uvicorn agent.web_api:app --port 8001` (`FAKE_TOOLS=1` uses the fake printer), then run the page with `NEXT_PUBLIC_USE_MOCK=0` (the `api` and `web-real-api` entries in `.claude/launch.json`). Without it the page runs on mock data.
 
 The server wraps the existing agent and adds no tool logic of its own.
 
 - Keep one `Agent` (`agent/loop.py`) per browser session, identified by a session cookie. The same agent serves all three pages.
-- The server owns the measurement document, the current limb and socket revisions, and the print phase (README §13).
+- The server owns the measurement document, the current limb and socket revisions, and the print phase ([README_LONG](README_LONG.md) §13).
 - JSON bodies reuse the existing envelopes: `ToolResult.to_dict()` (`common/result.py`), `Pause`, and the `on_event` payloads. The page's TypeScript copies are in `agent/ui/web/lib/types.ts`. Keep the two in sync.
 - The browser sends ids, never filesystem paths. The server resolves ids to files.
 
@@ -96,13 +96,13 @@ These endpoints are polled about every 2 seconds while the page is open, includi
 | Method and path | Returns | Backed by |
 |---|---|---|
 | `GET /api/printer` | `ToolResult` with `PrinterStatus` data. Used for readiness. | `get_printer_status` |
-| `GET /api/print/snapshot` | `PrintSnapshot`, or `null` before a verified start | The server-side poll in README §12 "Print monitoring" |
+| `GET /api/print/snapshot` | `PrintSnapshot`, or `null` before a verified start | The server-side poll in [README_LONG](README_LONG.md) §12 "Print monitoring" |
 | `GET /api/print/layers` | `PrintLayers`: each layer's `z` and outer-wall paths, or `null` without the job's G-code (fake printer) | `tools/printer/gcode_layers.py` |
 | `GET /api/report` | The fabrication report JSON, including the last observed step | The audit log |
 
 `PrintSnapshot` (`lib/types.ts`) holds:
-- one `step`: Starting, Printing, Pausing, Paused, Error, Link lost, Cancelled or Finished, chosen by the rules in README §12;
-- `completion`, exactly as OctoPrint returned it (README marks its scale as unresolved);
+- one `step`: Starting, Printing, Pausing, Paused, Error, Link lost, Cancelled or Finished, chosen by the rules in [README_LONG](README_LONG.md) §12;
+- `completion`, exactly as OctoPrint returned it ([README_LONG](README_LONG.md) marks its scale as unresolved);
 - `filepos`, `print_time_s` and `print_time_left_s` (`null` when OctoPrint omits it);
 - `file`, `filament_mm` and `port`;
 - `temperatures`, when present;
@@ -124,5 +124,5 @@ These endpoints read only. They never call `start_print`, never change the job l
 3. **STL files.** `GET /api/files/{id}/{role}.stl` writes `view.stl` from the revision's STEP on first request, in the design orientation. (The print STL, `part.stl`, is turned opening-up and is not served.)
 4. **Socket validation on the page.** A socket made by `modify_socket` or `fit_socket_to_limb` comes back with `data.validation` set to "not validated" (no categories). `validate_part` results carry the full `validate_socket` report in `data.validation`. `POST /api/socket/confirm` returns 409 unless the current socket passed.
 5. **Slice confirmation.** Still only `start_print` is confirmable; "Approve slice" stays disabled.
-6. **Print snapshot.** Read from OctoPrint's job, printer and connection endpoints on each poll, with the step rules of README §12. A failed read returns the last snapshot as `Link lost`, `stale: true`.
+6. **Print snapshot.** Read from OctoPrint's job, printer and connection endpoints on each poll, with the step rules of [README_LONG](README_LONG.md) §12. A failed read returns the last snapshot as `Link lost`, `stale: true`.
 7. **Page changes the model should know.** The form, Confirm limb and Confirm socket add a short `[workbench page]` note to the agent's conversation, so a later chat request builds on them.

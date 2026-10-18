@@ -1,6 +1,6 @@
 # Shim web workbench
 
-The landing page (`/`) introduces the tool-calling agent and links to the three-stage frontend from README §3 and §13:
+The landing page (`/`) introduces the tool-calling agent and links to the three-stage frontend from [README_LONG](../../../docs/README_LONG.md) §3 and §13:
 - **Residual limb** (`/limb`): the 3D limb, the measurement profile, the agent chat, and Confirm.
 - **Socket** (`/socket`): the socket shell, its geometric checks, the agent chat, and Confirm.
 - **Printer** (`/printer`): the job metadata, slice and print controls, the agent chat, and the report.
@@ -44,7 +44,7 @@ To run against the real API, start the `web-real-api` entry in the repo's `.clau
 | `components/app-shell.tsx` | Top bar with the three steps. A step unlocks after the previous Confirm. Also holds the page heading, Confirm button, and global approval dialog. |
 | `components/measurement-profile.tsx` | Required fields always expanded; optional fields in an expandable disclosure |
 | `components/agent-chat.tsx`, `chat-panel.tsx` | Agent chat with editable example instructions and a collapsible tool-call trace |
-| `components/print-panel.tsx` | One highlighted step plus the OctoPrint fields (README §12). Missing fields say "not reported". |
+| `components/print-panel.tsx` | One highlighted step plus the OctoPrint fields ([README_LONG](../../../docs/README_LONG.md) §12). Missing fields say "not reported". |
 | `components/print-controls.tsx` | Slice and print actions, and the confirmation dialog |
 | `components/stl-viewer.tsx`, `validation-list.tsx`, `header-dots.tsx` | The three.js viewer, the geometric checks, and the header dot field |
 | `lib/types.ts`, `lib/api.ts`, `lib/mock/mock-api.ts` | Types that mirror Python, the API interface plus the HTTP client, and the mock |

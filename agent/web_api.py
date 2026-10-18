@@ -21,6 +21,7 @@ The browser sends revision ids, never file paths.
 
 from __future__ import annotations
 
+import hmac
 import json
 import math
 import os
@@ -31,6 +32,7 @@ import threading
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 import cadquery as cq
 from fastapi import FastAPI, Request
@@ -54,6 +56,15 @@ from tools.printer import gcode_layers  # noqa: E402
 API_BASE = os.environ.get("API_PUBLIC_BASE", "http://localhost:8001/api")
 ORIGINS = os.environ.get("WEB_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
 COOKIE = "shim_session"
+
+# Site login for the hosted demo. Caddy asks /api/auth/check before every request
+# (deploy/start.sh); locally, without Caddy, nothing enforces it.
+AUTH_COOKIE = "shim_auth"
+SITE_PASSWORD = os.environ.get("SHIM_PASSWORD", "shim")  # hardcoded on purpose for the demo
+# A new secret per start signs everyone out on restart (sessions reset then anyway).
+AUTH_TOKEN = hmac.new(
+    (os.environ.get("SHIM_AUTH_SECRET") or secrets.token_hex(16)).encode(), SITE_PASSWORD.encode(), "sha256"
+).hexdigest()
 
 app = FastAPI(title="Shim workbench API")
 app.add_middleware(
@@ -427,6 +438,30 @@ def _stage_handler(session: Session, stage: str):
 # ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
+
+
+@app.post("/api/login")
+async def login(request: Request):
+    body = await request.json()
+    if not hmac.compare_digest(str(body.get("password", "")).encode(), SITE_PASSWORD.encode()):
+        return JSONResponse({"error": "That password is not right."}, status_code=401)
+    response = JSONResponse({"ok": True})
+    # Brev's proxy ends HTTPS before Caddy, so trust the configured public URL as well.
+    secure = request.headers.get("x-forwarded-proto") == "https" or API_BASE.startswith("https://")
+    response.set_cookie(AUTH_COOKIE, AUTH_TOKEN, httponly=True, samesite="lax", secure=secure, max_age=12 * 3600)
+    return response
+
+
+@app.get("/api/auth/check")
+def auth_check(request: Request):
+    """Caddy's forward_auth: 200 when signed in; else 401 for API calls, a redirect to /login for pages."""
+    if hmac.compare_digest(request.cookies.get(AUTH_COOKIE, ""), AUTH_TOKEN):
+        return Response(status_code=200)
+    uri = request.headers.get("x-forwarded-uri", "/")
+    if uri.startswith("/api/"):
+        return JSONResponse({"error": "Sign in first."}, status_code=401)
+    target = "/login" if uri in ("/", "/login") else f"/login?next={quote(uri, safe='')}"
+    return Response(status_code=302, headers={"Location": target})
 
 
 @app.get("/api/session")

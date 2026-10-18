@@ -192,11 +192,22 @@ def test_a_session_can_only_watch_or_cancel_its_own_print():
 
 
 def test_a_busy_shared_printer_refuses_before_approval(monkeypatch):
-    from tools.fakes import printer_fakes
+    import sys
+    import types
+
+    import tools.fakes
 
     session = confirmed_session()
     session.job = {"job_id": "job_mine", "revision_id": "socket-2"}
-    monkeypatch.setitem(printer_fakes._printer, "busy_job", "job_theirs")
+    # Use the fake printer if it is loaded; otherwise stand in for it (importing it next to
+    # the real printer tools would register the same tool names twice).
+    fakes = sys.modules.get("tools.fakes.printer_fakes")
+    if fakes is not None:
+        monkeypatch.setitem(fakes._printer, "busy_job", "job_theirs")
+    else:
+        stub = types.SimpleNamespace(_printer={"busy_job": "job_theirs"})
+        monkeypatch.setitem(sys.modules, "tools.fakes.printer_fakes", stub)
+        monkeypatch.setattr(tools.fakes, "printer_fakes", stub, raising=False)
     busy = w._stage_guard(session, "request_confirmation", {"action": "start_print", "subject": "job_mine"})
     assert busy.status == "fatal" and busy.error.code == "printer_busy"
     assert "try again" in busy.message
@@ -208,8 +219,8 @@ def test_a_busy_shared_printer_refuses_before_approval(monkeypatch):
         def job(self):
             return {"state": "Printing", "job": {"file": {"name": "job_theirs.gcode"}}, "progress": {"printTimeLeft": 1250}}
 
-    import tools.printer.tools as printer_tools
-    monkeypatch.setattr(printer_tools, "_client", lambda: Client())
+    # Stand in for the real printer module: importing it would register its tools a second time.
+    monkeypatch.setitem(sys.modules, "tools.printer.tools", types.SimpleNamespace(_client=lambda: Client()))
     assert w._printer_busy_elsewhere(session, "job_mine") == (True, 21)
     real = w._stage_guard(session, "start_print", {"job_id": "job_mine", "confirmation_id": "c"})
     assert real.error.code == "printer_busy" and "about 21 minutes" in real.message
@@ -218,5 +229,5 @@ def test_a_busy_shared_printer_refuses_before_approval(monkeypatch):
         def job(self):
             return {"state": "Printing", "job": {"file": {"name": "job_mine.gcode"}}, "progress": {}}
 
-    monkeypatch.setattr(printer_tools, "_client", lambda: Mine())
+    monkeypatch.setitem(sys.modules, "tools.printer.tools", types.SimpleNamespace(_client=lambda: Mine()))
     assert w._printer_busy_elsewhere(session, "job_mine") == (False, None)

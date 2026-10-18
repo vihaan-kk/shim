@@ -76,7 +76,16 @@ const STATUS_STYLE: Record<string, string> = {
   fatal: "text-destructive",
 };
 
-function ToolTrace({ steps }: { steps: TraceStep[] }) {
+// Built-in tools that pause for the person; every other tool runs on the server.
+const PERSON_TOOLS = new Set(["ask_user", "request_confirmation"]);
+
+// What a step without a result is doing. latest: this is the newest trace; busy: a turn is running.
+function pendingLabel(name: string, latest: boolean, busy: boolean): string {
+  if (PERSON_TOOLS.has(name)) return latest && !busy ? "waiting for you" : "answered";
+  return latest && busy ? "running…" : "no result";
+}
+
+function ToolTrace({ steps, latest, busy }: { steps: TraceStep[]; latest: boolean; busy: boolean }) {
   return (
     <Collapsible className="rounded-md border border-dashed bg-secondary/60">
       <CollapsibleTrigger className="eyebrow flex w-full cursor-pointer items-center justify-between px-3 py-2">
@@ -96,7 +105,7 @@ function ToolTrace({ steps }: { steps: TraceStep[] }) {
                   {step.result.error ? ` [${step.result.error.code}]` : ""}: {step.result.message}
                 </span>
               ) : (
-                <span className="text-muted-foreground">← waiting for the person</span>
+                <span className="text-muted-foreground">← {pendingLabel(step.name, latest, busy)}</span>
               )}
             </li>
           ))}
@@ -132,6 +141,7 @@ export function ChatPanel({
   }, [items.length]);
 
   const awaitingApproval = pending?.kind === "confirmation";
+  const latestTraceId = items.findLast((item) => item.role === "trace")?.id;
   // Choice buttons belong to the currently pending question only; once it is
   // answered (or an identical question was asked earlier) they disappear.
   const pendingQuestionIndex =
@@ -178,7 +188,7 @@ export function ChatPanel({
         )}
         {items.map((item, itemIndex) =>
           item.role === "trace" ? (
-            <ToolTrace key={item.id} steps={item.steps} />
+            <ToolTrace key={item.id} steps={item.steps} latest={item.id === latestTraceId} busy={busy} />
           ) : (
             <div
               key={item.id}

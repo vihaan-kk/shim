@@ -203,6 +203,10 @@ function snapshot(): PrintSnapshot | null {
 export const mockApi: WorkbenchApi = {
   isMock: true,
 
+  async login() {
+    // The mock has no server, so there is nothing to sign in to.
+  },
+
   async getSession() {
     await sleep(150);
     return {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the page and start every service on the Brev instance in one tmux session, "shim".
 # Usage, on the instance: ~/shim/deploy/start.sh https://8080-<id>.gobrev.dev
-# The site asks for a login: user "shim", password "shim" (hardcoded; override with SHIM_PASSWORD).
+# The site asks for a password on its /login page: "shim" (hardcoded; override with SHIM_PASSWORD).
 # Services: OctoPrint :5001, API :8001, Next.js :3000, Caddy :8080 (the only one to expose).
 # vLLM is expected on localhost:8000 already (the Docker container).
 # Stop everything with: tmux kill-session -t shim
@@ -19,26 +19,36 @@ export FAKE_TOOLS=0
 export PRUSASLICER_BIN=$HOME/opt/prusaslicer/AppRun
 export API_PUBLIC_BASE=$public_url/api
 export WEB_ORIGINS=$public_url
+export SHIM_PASSWORD=${SHIM_PASSWORD:-shim}
+export SHIM_AUTH_SECRET=$(openssl rand -hex 16)
 EOF
 
 # The page calls the API on its own origin, so the session cookie needs no cross-site settings.
 (cd "$root/agent/ui/web" && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=/api npm run build)
 
-hash="$(caddy hash-password --plaintext "${SHIM_PASSWORD:-shim}")"
-auth="basic_auth {
-    shim $hash
-  }"
-cat > "$root/deploy/Caddyfile" <<EOF
+# Caddy asks the API (/api/auth/check) before every request except the landing page, the
+# login page and the static files they need. Signed out: workbench pages redirect to
+# /login (then back to the page asked for), API calls get 401.
+cat > "$root/deploy/Caddyfile" <<'EOF'
 :8080 {
-  $auth
-  handle /api/* {
-    # The agent streams its turn as server-sent events; do not buffer them.
-    reverse_proxy 127.0.0.1:8001 {
-      flush_interval -1
+  route {
+    @open path / /login /api/login /_next/* /icon.svg
+    handle @open {
+      reverse_proxy /api/* 127.0.0.1:8001
+      reverse_proxy 127.0.0.1:3000
     }
-  }
-  handle {
-    reverse_proxy 127.0.0.1:3000
+    forward_auth 127.0.0.1:8001 {
+      uri /api/auth/check
+    }
+    handle /api/* {
+      # The agent streams its turn as server-sent events; do not buffer them.
+      reverse_proxy 127.0.0.1:8001 {
+        flush_interval -1
+      }
+    }
+    handle {
+      reverse_proxy 127.0.0.1:3000
+    }
   }
 }
 EOF

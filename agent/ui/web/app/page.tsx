@@ -34,7 +34,7 @@ export default function LandingPage() {
         <div className="flex flex-col items-start gap-5">
           <h1 id="intro-title" className="landing-title">Your words.<br />The right tools.<br /><span className="text-muted-foreground">A tangible next step.</span></h1>
           <p className="max-w-lg text-base leading-relaxed text-foreground/70">Meet Shim, a tool-calling agent that turns your instructions into measurement updates, socket geometry, and a virtual print. You guide the process. Shim connects the tools.</p>
-          <Link href="/limb" className="inline-flex min-h-12 items-center gap-8 rounded-full bg-primary px-6 py-3 text-sm text-primary-foreground transition-colors hover:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-4">Start with your measurements <span aria-hidden="true">↗</span></Link>
+          <Link href="/limb" className="inline-flex min-h-12 items-center gap-8 rounded-full bg-primary px-6 py-3 text-sm text-primary-foreground transition-colors hover:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-4">Start with the measurements <span aria-hidden="true">↗</span></Link>
         </div>
         <div className="rounded-md border bg-card p-5 sm:p-6" aria-label="Illustrative example of the agent calling a tool">
           <div className="mb-6 flex items-center justify-between gap-3"><span className="eyebrow">From instruction to action</span><span className="eyebrow">Example</span></div>

@@ -111,6 +111,7 @@ class Session:
     socket_confirmed: bool = False
     job: dict | None = None
     started: bool = False
+    started_jobs: set = field(default_factory=set)  # job_ids with a verified start_print
     pending: dict | None = None
     seen_printing: bool = False
     last_snapshot: dict | None = None
@@ -203,12 +204,40 @@ def _build_socket(session: Session, limb_id: str, by: str) -> tuple[dict | None,
 # no matter which page the user asks from or how they phrase it.
 PRINT_STAGE_TOOLS = {"prepare_print", "slice", "start_print"}
 
+# Part types outside the fixed workbench flow (residual limb -> its socket ->
+# print that socket). The agent cannot mint them in the web app at all.
+OFF_FLOW_PARTS = {"foot", "adapter", "pylon", "assembly"}
+
 
 def _stage_guard(session: Session, name: str, args: dict):
-    """Agent tool_guard for this session: printing waits for a confirmed socket."""
-    if session.socket_confirmed:
+    """Agent tool_guard for this session: the flow is fixed.
+
+    Residual limb, then the socket fitted to it, then printing that socket -
+    nothing else. Other part types cannot be created, only the confirmed
+    socket (built for the current limb) can be prepared, sliced or printed,
+    and a job that has already started can never be started or re-confirmed.
+    """
+    if name == "create_part" and args.get("part_type") in OFF_FLOW_PARTS:
+        return fatal(
+            code="off_flow",
+            reason=(
+                f"This workbench only builds a residual limb and its socket; it cannot create "
+                f"a {args.get('part_type')}. The fixed flow is: residual limb, then the socket "
+                "fitted to it, then printing that socket."
+            ),
+            message=(
+                "Do not create other part types. Continue the limb -> socket -> print flow, "
+                "or explain that flow to the user."
+            ),
+        )
+    wants_print = name in PRINT_STAGE_TOOLS or (
+        name == "request_confirmation" and args.get("action") == "start_print"
+    )
+    if not wants_print:
         return None
-    if name in PRINT_STAGE_TOOLS or (name == "request_confirmation" and args.get("action") == "start_print"):
+    socket = (session.socket or {}).get("socket") or {}
+    socket_id = socket.get("socket_id")
+    if not session.socket_confirmed or socket_id is None:
         return fatal(
             code="stage_gate",
             reason=(
@@ -220,6 +249,51 @@ def _stage_guard(session: Session, name: str, args: dict):
                 "Do not retry printing tools. Explain the stage order (limb, then socket, "
                 "then printer) and offer to take the user to the socket stage."
             ),
+        )
+    if socket.get("limb_revision_id") != session.limb["revision_id"]:
+        return fatal(
+            code="stage_gate",
+            reason=(
+                "The confirmed socket was built for an earlier limb revision and the limb "
+                "has changed since, so it is no longer the socket for the current limb."
+            ),
+            message=(
+                "Do not print the stale socket. Take the user back to the socket stage "
+                "(move_to_stage) so a socket is built and confirmed for the current limb."
+            ),
+        )
+    if name in ("prepare_print", "slice"):
+        if args.get("revision_id") != socket_id:
+            return fatal(
+                code="off_flow",
+                reason=(
+                    f"Only the confirmed socket ({socket_id}) can be prepared or sliced in "
+                    f"this flow; {args.get('revision_id') or 'an unspecified part'} is not it."
+                ),
+                message="Do not prepare or slice other parts. Print the confirmed socket, or go back a stage with move_to_stage.",
+            )
+        return None
+    # start_print itself, or a request to confirm one: the job must be the
+    # sliced job for the confirmed socket, and never one already started.
+    job_id = args.get("job_id") or args.get("subject")
+    if job_id in session.started_jobs:
+        return fatal(
+            code="already_started",
+            reason=f"Job {job_id} has already been started; a print can only be started once.",
+            message=(
+                "Do not call start_print or request another confirmation for this job. "
+                "Report its current state to the user (get_job_progress / get_printer_status)."
+            ),
+        )
+    job = session.job or {}
+    if job_id != job.get("job_id") or job.get("revision_id") != socket_id:
+        return fatal(
+            code="off_flow",
+            reason=(
+                f"Only the sliced job for the confirmed socket ({socket_id}) can be started "
+                "in this flow. Slice the confirmed socket first if no such job exists."
+            ),
+            message="Do not start or confirm prints for other parts or stale jobs.",
         )
     return None
 
@@ -323,11 +397,19 @@ def _enrich(session: Session, name: str, result: dict) -> dict:
         data["socket_id"] = sid
         data["stl_url"] = _stl_url(sid, "socket_shell")
         data["validation"] = _not_validated(sid)  # a new revision has no checks yet
-        if session.socket is not None:
-            session.socket = {
-                "socket": {**session.socket["socket"], "socket_id": sid, "stl_url": data["stl_url"]},
-                "validation": data["validation"],
-            }
+        # A fit re-targets the socket at a (possibly new) limb: record which
+        # limb this revision was built for, or the stage gate reads the fresh
+        # socket as stale against the previous limb and rebuilds it again.
+        # A chat-first fit with no page-built socket yet still opens the
+        # session bundle so the stage flow can see the socket.
+        socket_info = {
+            **(session.socket or {}).get("socket", {}),
+            "socket_id": sid,
+            "stl_url": data["stl_url"],
+        }
+        if data.get("limb_revision_id"):
+            socket_info["limb_revision_id"] = data["limb_revision_id"]
+        session.socket = {"socket": socket_info, "validation": data["validation"]}
         session.socket_confirmed = False
         session.note("socket_built", socket=sid, by=name)
     elif name in ("prepare_print", "slice"):
@@ -335,6 +417,7 @@ def _enrich(session: Session, name: str, result: dict) -> dict:
         session.note("sliced", job=data.get("job_id"), profile=data.get("profile_id"))
     elif name == "start_print" and data.get("verified"):
         session.started = True
+        session.started_jobs.add(data.get("job_id"))
         session.seen_printing = False
         session.last_snapshot = None
         session.note("print_started", job=data.get("job_id"))

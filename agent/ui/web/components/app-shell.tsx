@@ -55,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          <span />
+          {api.isMock ? <Badge variant="secondary">Mock data</Badge> : <span />}
         </div>
       </header>
 

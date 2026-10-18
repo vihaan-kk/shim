@@ -71,7 +71,7 @@ export function PrintPanel() {
       <div className="grid gap-3">
         <div className="flex items-baseline gap-3">
           <span className={cn("display-2 font-mono tabular-nums", snap.stale && "text-muted-foreground")}>
-            {snap.completion ?? "—"}
+            {snap.completion == null ? "—" : snap.completion.toFixed(1)}
             {snap.completion != null && "%"}
           </span>
           <span className="text-sm text-muted-foreground">completion as reported by OctoPrint</span>

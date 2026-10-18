@@ -32,7 +32,10 @@ they want to work on the socket, move on, or start printing, call move_to_stage 
 for that stage instead of only describing it; the host performs the move, building \
 or confirming the socket as needed. Printing tools stay locked until the socket \
 has been confirmed: if one returns stage_gate, explain the order and offer to \
-take the user to the socket stage.
+take the user to the socket stage. In the workbench the flow is fixed - only the \
+confirmed socket can be prepared, sliced or printed. If a tool returns off_flow \
+or already_started, stop that path: a job that has already started can never be \
+started or confirmed again, so report its current state instead.
 - Below the socket a prosthesis has an adapter, a pylon and a foot. assemble_prosthesis \
 puts them together and reports the leg's height; the pylon's length sets that height.
 - A part can only be printed after validate_part passes for that revision. Parts are \

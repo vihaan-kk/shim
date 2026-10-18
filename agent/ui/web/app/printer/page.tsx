@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { AgentChat } from "@/components/agent-chat";
 import { PageHeading } from "@/components/app-shell";
+import { LayerView } from "@/components/layer-view";
 import { PrintBar } from "@/components/print-controls";
 import { PrintPanel } from "@/components/print-panel";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,11 @@ export default function PrinterPage() {
               <PrintPanel />
             </div>
           </section>
+          {session.started && (
+            <section aria-label="Live layer view" className="rounded-md border bg-card p-5">
+              <LayerView />
+            </section>
+          )}
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" className="h-10 rounded-full px-5" onClick={session.downloadReport}>
               Download report

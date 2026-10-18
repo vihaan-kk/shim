@@ -78,7 +78,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 function ToolTrace({ steps }: { steps: TraceStep[] }) {
   return (
-    <Collapsible defaultOpen className="rounded-md border border-dashed bg-secondary/60">
+    <Collapsible className="rounded-md border border-dashed bg-secondary/60">
       <CollapsibleTrigger className="eyebrow flex w-full cursor-pointer items-center justify-between px-3 py-2">
         <span>Tool calls · {steps.length}</span>
         <span>{steps.map((s) => s.name).join(" → ")}</span>

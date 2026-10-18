@@ -27,13 +27,13 @@ export default function ResidualLimbPage() {
       <PageHeading
         step="Step 1 of 3"
         title="Residual limb"
-        description="The standardized transtibial shape is loaded. Set the measurements here or tell the agent, then confirm the limb to build its socket."
+        description="The standardized transtibial shape is loaded. Ask the agent to change a measurement, then confirm the limb to build its socket."
         action={
           <ConfirmButton
-            disabled={!session.requiredFilled || !session.limb || session.measurementsDirty || session.applying || session.busy}
+            disabled={!session.requiredFilled || !session.limb || session.busy}
             pending={session.confirmingLimb}
             onClick={confirm}
-            hint={session.measurementsDirty ? "Apply your measurements before continuing" : session.requiredFilled ? `Confirms limb ${session.limb?.revision_id ?? "…"}` : "Fill length, P and D to confirm"}
+            hint={session.requiredFilled ? `Confirms limb ${session.limb?.revision_id ?? "…"}` : "Waiting for the limb measurements"}
           >
             Confirm limb →
           </ConfirmButton>
@@ -54,18 +54,18 @@ export default function ResidualLimbPage() {
               skin
               label="Transtibial Residual Limb 3D demonstration"
               annotations={{
-                lengthMm: session.appliedMeasurements.length_mm,
+                lengthMm: session.measurements.length_mm,
                 stations: [
-                  { label: "P", zMm: 40, circumferenceMm: session.appliedMeasurements.proximal_circumference_mm },
+                  { label: "P", zMm: 40, circumferenceMm: session.measurements.proximal_circumference_mm },
                   {
                     label: "M",
-                    zMm: (session.appliedMeasurements.length_mm ?? 140) / 2,
-                    circumferenceMm: session.appliedMeasurements.mid_circumference_mm,
+                    zMm: (session.measurements.length_mm ?? 140) / 2,
+                    circumferenceMm: session.measurements.mid_circumference_mm,
                   },
                   {
                     label: "D",
-                    zMm: (session.appliedMeasurements.length_mm ?? 140) - 40,
-                    circumferenceMm: session.appliedMeasurements.distal_circumference_mm,
+                    zMm: (session.measurements.length_mm ?? 140) - 40,
+                    circumferenceMm: session.measurements.distal_circumference_mm,
                   },
                 ],
               }}

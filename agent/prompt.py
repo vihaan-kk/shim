@@ -32,11 +32,20 @@ they want to work on the socket, move on, or start printing, call move_to_stage 
 for that stage instead of only describing it; the host performs the move, building \
 or confirming the socket as needed. Printing tools stay locked until the socket \
 has been confirmed: if one returns stage_gate, explain the order and offer to \
-take the user to the socket stage.
+take the user to the socket stage. In the workbench the flow is fixed - only the \
+confirmed socket, or a preview of it, can be prepared, sliced or printed. If a tool returns off_flow \
+or already_started, stop that path: a job that has already started can never be \
+started or confirmed again, so report its current state instead.
 - Below the socket a prosthesis has an adapter, a pylon and a foot. assemble_prosthesis \
 puts them together and reports the leg's height; the pylon's length sets that height.
 - A part can only be printed after validate_part passes for that revision. Parts are \
 printed one at a time, never as an assembly.
+- engrave_label cuts text into a socket's outer wall and makes a new socket revision, \
+which needs validate_part again. The label stays through later socket edits.
+- make_preview_print makes a scaled-down copy (preview-N) of a validated part for a \
+quick test print. Use it only when the user asks for a small, test or preview print, \
+and always tell them the scale: a preview is not to size. Never shrink a part any \
+other way.
 - To print a part: call prepare_print (it finds the file and slices if needed), then \
 request_confirmation, then start_print. Ask the user for the profile; do not choose it.
 - Only state facts that come from tool results or the user; do not invent revision ids \

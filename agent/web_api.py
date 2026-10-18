@@ -39,7 +39,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from agent.llm import VllmClient
 from agent.loop import Agent, Pause
 from agent.ui.cli import load_env
-from common.result import fatal, success
+from common.result import fatal, fixable, success
 from tools import registry
 
 load_env()
@@ -48,6 +48,7 @@ FAKE_PRINTER = os.environ.get("FAKE_TOOLS", "0") == "1"
 
 from tools.cad import questionnaire  # noqa: E402  (after load_env: reads WORKSPACE_DIR)
 from tools.cad import tools as cad  # noqa: E402
+from tools.printer import gcode_layers  # noqa: E402
 
 API_BASE = os.environ.get("API_PUBLIC_BASE", "http://localhost:8001/api")
 ORIGINS = os.environ.get("WEB_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
@@ -111,6 +112,8 @@ class Session:
     socket_confirmed: bool = False
     job: dict | None = None
     started: bool = False
+    started_jobs: set = field(default_factory=set)  # job_ids with a verified start_print
+    cancelled_jobs: set = field(default_factory=set)  # job_ids cancel_print stopped
     pending: dict | None = None
     seen_printing: bool = False
     last_snapshot: dict | None = None
@@ -203,12 +206,51 @@ def _build_socket(session: Session, limb_id: str, by: str) -> tuple[dict | None,
 # no matter which page the user asks from or how they phrase it.
 PRINT_STAGE_TOOLS = {"prepare_print", "slice", "start_print"}
 
+# Part types outside the fixed workbench flow (residual limb -> its socket ->
+# print that socket). The agent cannot mint them in the web app at all.
+OFF_FLOW_PARTS = {"foot", "adapter", "pylon", "assembly"}
+
+
+def _preview_of(revision_id: str | None) -> str | None:
+    """The part a preview-N revision is a scaled copy of, or None for anything else."""
+    meta = cad._read_meta(revision_id) if revision_id else None
+    return meta.get("preview_of") if meta and meta["part_type"] == "preview" else None
+
+
+def _in_flow(revision_id: str | None, socket_id: str) -> bool:
+    """The confirmed socket, or a scaled preview made from it, may be printed."""
+    return revision_id == socket_id or _preview_of(revision_id) == socket_id
+
 
 def _stage_guard(session: Session, name: str, args: dict):
-    """Agent tool_guard for this session: printing waits for a confirmed socket."""
-    if session.socket_confirmed:
+    """Agent tool_guard for this session: the flow is fixed.
+
+    Residual limb, then the socket fitted to it, then printing that socket -
+    nothing else. Other part types cannot be created, only the confirmed
+    socket (built for the current limb) can be prepared, sliced or printed,
+    and a job that has already started can never be started or re-confirmed.
+    """
+    if name == "create_part" and args.get("part_type") in OFF_FLOW_PARTS:
+        return fatal(
+            code="off_flow",
+            reason=(
+                f"This workbench only builds a residual limb and its socket; it cannot create "
+                f"a {args.get('part_type')}. The fixed flow is: residual limb, then the socket "
+                "fitted to it, then printing that socket."
+            ),
+            message=(
+                "Do not create other part types. Continue the limb -> socket -> print flow, "
+                "or explain that flow to the user."
+            ),
+        )
+    wants_print = name in PRINT_STAGE_TOOLS or (
+        name == "request_confirmation" and args.get("action") == "start_print"
+    )
+    if not wants_print:
         return None
-    if name in PRINT_STAGE_TOOLS or (name == "request_confirmation" and args.get("action") == "start_print"):
+    socket = (session.socket or {}).get("socket") or {}
+    socket_id = socket.get("socket_id")
+    if not session.socket_confirmed or socket_id is None:
         return fatal(
             code="stage_gate",
             reason=(
@@ -221,6 +263,58 @@ def _stage_guard(session: Session, name: str, args: dict):
                 "then printer) and offer to take the user to the socket stage."
             ),
         )
+    if socket.get("limb_revision_id") != session.limb["revision_id"]:
+        return fatal(
+            code="stage_gate",
+            reason=(
+                "The confirmed socket was built for an earlier limb revision and the limb "
+                "has changed since, so it is no longer the socket for the current limb."
+            ),
+            message=(
+                "Do not print the stale socket. Take the user back to the socket stage "
+                "(move_to_stage) so a socket is built and confirmed for the current limb."
+            ),
+        )
+    if name in ("prepare_print", "slice"):
+        if not args.get("revision_id"):
+            # prepare_print's revision_id is optional; here it must name the socket.
+            return fixable(
+                code="missing_argument",
+                reason=f"In this flow, prepare_print and slice must name the confirmed socket ({socket_id}).",
+                message=f"Call {name} again with revision_id {socket_id}.",
+            )
+        if not _in_flow(args["revision_id"], socket_id):
+            return fatal(
+                code="off_flow",
+                reason=(
+                    f"Only the confirmed socket ({socket_id}) or a preview of it can be prepared or sliced in "
+                    f"this flow; {args.get('revision_id') or 'an unspecified part'} is not it."
+                ),
+                message="Do not prepare or slice other parts. Print the confirmed socket, or go back a stage with move_to_stage.",
+            )
+        return None
+    # start_print itself, or a request to confirm one: the job must be the
+    # sliced job for the confirmed socket, and never one already started.
+    job_id = args.get("job_id") or args.get("subject")
+    if job_id in session.started_jobs:
+        return fatal(
+            code="already_started",
+            reason=f"Job {job_id} has already been started; a print can only be started once.",
+            message=(
+                "Do not call start_print or request another confirmation for this job. "
+                "Report its current state to the user (get_job_progress / get_printer_status)."
+            ),
+        )
+    job = session.job or {}
+    if job_id != job.get("job_id") or not _in_flow(job.get("revision_id"), socket_id):
+        return fatal(
+            code="off_flow",
+            reason=(
+                f"Only the sliced job for the confirmed socket ({socket_id}) can be started "
+                "in this flow. Slice the confirmed socket first if no such job exists."
+            ),
+            message="Do not start or confirm prints for other parts or stale jobs.",
+        )
     return None
 
 
@@ -232,7 +326,7 @@ def _stage_handler(session: Session, stage: str):
     if stage == "socket":
         # Build when there is no socket yet, or the limb changed after the
         # existing socket was built for an earlier limb.
-        if session.socket is None or session.socket["socket"]["limb_revision_id"] != session.limb["revision_id"]:
+        if session.socket is None or session.socket["socket"].get("limb_revision_id") != session.limb["revision_id"]:
             error, _ = _build_socket(session, session.limb["revision_id"], by="chat_stage")
             if error is not None:
                 reason = (error.get("error") or {}).get("reason") or error.get("message") or "unknown error"
@@ -318,23 +412,35 @@ def _enrich(session: Session, name: str, result: dict) -> dict:
         session.limb = {"revision_id": rid, "parent_revision_id": data.get("parent_revision_id"), "stl_url": data["stl_url"]}
         session.measurements = {**_form_defaults(), **data["measurements"]}
         session.note("limb_built", limb=rid, edits=edits, by="agent")
-    elif name in ("fit_socket_to_limb", "modify_socket"):
+    elif name in ("fit_socket_to_limb", "modify_socket", "engrave_label"):
         sid = data["revision_id"]
         data["socket_id"] = sid
         data["stl_url"] = _stl_url(sid, "socket_shell")
         data["validation"] = _not_validated(sid)  # a new revision has no checks yet
-        if session.socket is not None:
-            session.socket = {
-                "socket": {**session.socket["socket"], "socket_id": sid, "stl_url": data["stl_url"]},
-                "validation": data["validation"],
-            }
+        # Record which limb this revision was built for, or the stage gate reads
+        # a fresh socket as stale and rebuilds it. The revision's meta is the
+        # source (modify_socket inherits it from its parent; None means the
+        # standard limb). A chat-first socket with no page-built one yet still
+        # opens the session bundle so the stage flow can see it.
+        meta = cad._read_meta(sid) or {}
+        socket_info = {
+            **(session.socket or {}).get("socket", {}),
+            "socket_id": sid,
+            "stl_url": data["stl_url"],
+            "limb_revision_id": meta.get("limb_revision_id", data.get("limb_revision_id")),
+        }
+        session.socket = {"socket": socket_info, "validation": data["validation"]}
         session.socket_confirmed = False
         session.note("socket_built", socket=sid, by=name)
     elif name in ("prepare_print", "slice"):
         session.job = data
         session.note("sliced", job=data.get("job_id"), profile=data.get("profile_id"))
+    elif name == "cancel_print":
+        session.cancelled_jobs.add(data.get("job_id") or (session.job or {}).get("job_id"))
+        session.note("print_cancelled", job=data.get("job_id"))
     elif name == "start_print" and data.get("verified"):
         session.started = True
+        session.started_jobs.add(data.get("job_id"))
         session.seen_printing = False
         session.last_snapshot = None
         session.note("print_started", job=data.get("job_id"))
@@ -363,6 +469,15 @@ def _turn(session: Session, run) -> StreamingResponse:
             finally:
                 session.agent.on_event = lambda *_: None
             pause_dict = asdict(pause)
+            if pause.kind == "confirmation":
+                # Scale never changes silently: a preview's confirmation says so, whatever the model wrote.
+                job = session.job or {}
+                source = _preview_of(job.get("revision_id")) if job.get("job_id") == pause.details.get("subject") else None
+                if source:
+                    scale = cad._read_meta(job["revision_id"])["scale_percent"]
+                    pause_dict["text"] = (
+                        f"PREVIEW at {scale:g}% of {source}, NOT TO SIZE. {pause_dict['text']}"
+                    )
             session.pending = pause_dict if pause.kind in ("question", "confirmation") else None
             if pause.kind == "confirmation":
                 session.note("confirmation_requested", **pause.details)
@@ -525,9 +640,15 @@ def _step(flags: dict, state_text: str, session: Session, completion) -> str:
         return "Pausing"
     if flags.get("paused") or text == "paused":
         return "Paused"
-    if flags.get("printing") and not flags.get("cancelling"):
+    if flags.get("cancelling") or text == "cancelling":
+        return "Cancelled"
+    if flags.get("printing"):
         session.seen_printing = True
         return "Printing"
+    # A job that stopped short of 100% was cancelled (here or in OctoPrint), never finished.
+    job_id = (session.job or {}).get("job_id")
+    if job_id in session.cancelled_jobs or (session.seen_printing and completion is not None and completion < 100):
+        return "Cancelled"
     if session.seen_printing or (completion is not None and completion >= 100):
         return "Finished"
     return "Starting"
@@ -594,19 +715,56 @@ def _read_fake(session: Session) -> dict:
     }
 
 
+def _job_gcode(session: Session) -> Path | None:
+    """The G-code the slicer wrote for the session's job; real slicing only."""
+    job_id = (session.job or {}).get("job_id")
+    path = cad.WORKSPACE / "gcode" / f"{job_id}.gcode"
+    return path if job_id and path.is_file() else None
+
+
+def _add_layer(session: Session, snap: dict) -> dict:
+    """Layer fields from OctoPrint's filepos, when the printer is printing this job's file."""
+    snap.update(layer=None, layer_count=None, layer_z=None)
+    gcode = _job_gcode(session)
+    if gcode is None or (snap.get("file") or {}).get("name") != gcode.name:
+        return snap
+    index = gcode_layers.index_layers(gcode)
+    number = gcode_layers.layer_at(index, snap.get("filepos"))
+    snap["layer_count"] = len(index["layers"])
+    if number is not None:
+        snap["layer"], snap["layer_z"] = number, index["layers"][number - 1]["z"]
+    return snap
+
+
+@app.get("/api/print/layers")
+def print_layers(request: Request):
+    """Outer-wall paths of every layer of the started job, for the live layer view. null without G-code."""
+    session, is_new = _session(request)
+    gcode = _job_gcode(session) if session.started else None
+    if gcode is None:
+        return _respond(session, is_new, JSONResponse(None))
+    index = gcode_layers.index_layers(gcode)
+    body = {
+        "job_id": session.job["job_id"],
+        "layer_count": len(index["layers"]),
+        "layers": [{"z": layer["z"], "paths": layer["paths"]} for layer in index["layers"]],
+    }
+    return _respond(session, is_new, JSONResponse(body))
+
+
 @app.get("/api/print/snapshot")
 def print_snapshot(request: Request):
     session, is_new = _session(request)
     if not session.started:
         return _respond(session, is_new, JSONResponse(None))
     try:
-        snap = _read_fake(session) if FAKE_PRINTER else _read_octoprint(session)
+        snap = _add_layer(session, _read_fake(session) if FAKE_PRINTER else _read_octoprint(session))
         session.last_snapshot = snap
     except Exception as exc:
         last = session.last_snapshot or {"job_id": (session.job or {}).get("job_id"), "completion": None, "filepos": None,
                                          "print_time_s": None, "print_time_left_s": None, "file": None,
                                          "filament_mm": None, "port": None, "temperatures": None,
-                                         "observed_at": None}
+                                         "observed_at": None, "layer": None, "layer_count": None, "layer_z": None}
         snap = {**last, "step": "Link lost", "stale": True, "error": f"{type(exc).__name__}"}
     if snap["step"] != (session.log[-1].get("step") if session.log and session.log[-1]["event"] == "print_step" else None):
         session.note("print_step", step=snap["step"], completion=snap.get("completion"))

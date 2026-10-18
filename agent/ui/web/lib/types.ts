@@ -128,6 +128,7 @@ export type PrintStep =
   | "Paused"
   | "Error"
   | "Link lost"
+  | "Cancelled"
   | "Finished";
 
 export interface Temperature {
@@ -149,6 +150,17 @@ export interface PrintSnapshot {
   port: string | null;
   temperatures: { tool0?: Temperature; bed?: Temperature } | null; // virtual-printer reports
   error: string | null;
+  // From filepos and the job's G-code (real slicer only): the layer being printed.
+  layer: number | null; // 1-based
+  layer_count: number | null;
+  layer_z: number | null; // mm
+}
+
+// GET /api/print/layers: each layer's height and outer-wall paths (flat x, y lists in mm).
+export interface PrintLayers {
+  job_id: string;
+  layer_count: number;
+  layers: { z: number; paths: number[][] }[];
 }
 
 // ----- page-level state (not a Python type) -----

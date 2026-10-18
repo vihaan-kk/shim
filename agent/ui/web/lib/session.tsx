@@ -15,6 +15,7 @@ import type {
   Pause,
   PreparedJob,
   PrinterStatus,
+  PrintLayers,
   PrintSnapshot,
   SocketValidation,
   ToolResult,
@@ -43,12 +44,8 @@ interface Session {
   loadError: string | null;
   // Limb page
   measurements: Measurements;
-  appliedMeasurements: Measurements;
-  measurementsDirty: boolean;
   setMeasurements: (m: Measurements) => void;
   limb: LimbRevision | null;
-  applying: boolean;
-  applyMeasurements: () => Promise<void>;
   requiredFilled: boolean;
   confirmingLimb: boolean;
   confirmLimb: () => Promise<boolean>;
@@ -71,6 +68,7 @@ interface Session {
   job: PreparedJob | null;
   started: boolean;
   snapshot: PrintSnapshot | null;
+  layers: PrintLayers | null;
   downloadReport: () => Promise<void>;
 }
 
@@ -84,12 +82,9 @@ export function useSession(): Session {
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [measurements, setMeasurements] = useState<Measurements>(EMPTY_MEASUREMENTS);
-  const [appliedMeasurements, setAppliedMeasurements] = useState<Measurements>(EMPTY_MEASUREMENTS);
-  const measurementsDirty = JSON.stringify(measurements) !== JSON.stringify(appliedMeasurements);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [limb, setLimb] = useState<LimbRevision | null>(null);
-  const [applying, setApplying] = useState(false);
   const [confirmingLimb, setConfirmingLimb] = useState(false);
   const [socket, setSocket] = useState<SocketBundle | null>(null);
   const [confirmingSocket, setConfirmingSocket] = useState(false);
@@ -106,11 +101,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [job, setJob] = useState<PreparedJob | null>(null);
   const [started, setStarted] = useState(false);
   const [snapshot, setSnapshot] = useState<PrintSnapshot | null>(null);
+  const [layers, setLayers] = useState<PrintLayers | null>(null);
+
+  // The started job's layer paths, fetched once per job for the live layer view.
+  const jobId = job?.job_id;
+  useEffect(() => {
+    if (!started || !jobId) return;
+    let alive = true;
+    api
+      .getPrintLayers()
+      .then((data) => alive && setLayers(data))
+      .catch(() => alive && setLayers(null));
+    return () => {
+      alive = false;
+    };
+  }, [started, jobId]);
 
   // The server is the source of truth; this applies its session snapshot.
   const applyServerSession = useCallback((s: Awaited<ReturnType<typeof api.getSession>>) => {
     setMeasurements(s.measurements);
-    setAppliedMeasurements(s.measurements);
     setLimb(s.limb);
     setSocket(s.socket);
     setSocketConfirmed(s.socket_confirmed);
@@ -182,13 +191,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         parent_revision_id: (data.parent_revision_id as string) ?? null,
         stl_url: String(data.stl_url),
       });
-      if (data.measurements) {
-        setMeasurements((m) => ({ ...m, ...(data.measurements as Partial<Measurements>) }));
-        setAppliedMeasurements((m) => ({ ...m, ...(data.measurements as Partial<Measurements>) }));
-      }
+      if (data.measurements) setMeasurements((m) => ({ ...m, ...(data.measurements as Partial<Measurements>) }));
     }
-    // fit_socket_to_limb also makes a new socket revision (e.g. after a limb change in chat).
-    if ((name === "modify_socket" || name === "fit_socket_to_limb") && data.socket_id) {
+    // fit_socket_to_limb and engrave_label also make a new socket revision.
+    if ((name === "modify_socket" || name === "fit_socket_to_limb" || name === "engrave_label") && data.socket_id) {
       // A new socket revision has not been checked yet; the server sends that state.
       setSocket((s) =>
         s
@@ -290,21 +296,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [runTurn],
   );
 
-  const applyMeasurements = useCallback(async () => {
-    setApplying(true);
-    try {
-      const { revision } = await api.applyMeasurements(measurements);
-      setLimb(revision);
-      setAppliedMeasurements({ ...measurements });
-    } catch (error) {
-      setItems((prev) => [...prev, { id: newId(), role: "error", text: (error as Error).message }]);
-    } finally {
-      setApplying(false);
-    }
-  }, [measurements]);
-
   const confirmLimb = useCallback(async () => {
-    if (!requiredFilled || !limb || measurementsDirty || applying) return false;
+    if (!requiredFilled || !limb) return false;
     setConfirmingLimb(true);
     try {
       setSocket(await api.confirmLimb(limb.revision_id));
@@ -315,7 +308,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setConfirmingLimb(false);
     }
-  }, [limb, requiredFilled, measurementsDirty, applying]);
+  }, [limb, requiredFilled]);
 
   const confirmSocket = useCallback(async () => {
     if (!socket) return false;
@@ -346,12 +339,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       loaded,
       loadError,
       measurements,
-      appliedMeasurements,
-      measurementsDirty,
       setMeasurements,
       limb,
-      applying,
-      applyMeasurements,
       requiredFilled,
       confirmingLimb,
       confirmLimb,
@@ -371,17 +360,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       job,
       started,
       snapshot,
+      layers,
       downloadReport,
     }),
     [
       loaded,
       loadError,
       measurements,
-      appliedMeasurements,
-      measurementsDirty,
       limb,
-      applying,
-      applyMeasurements,
       requiredFilled,
       confirmingLimb,
       confirmLimb,
@@ -399,6 +385,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       job,
       started,
       snapshot,
+      layers,
       downloadReport,
     ],
   );

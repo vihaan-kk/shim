@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HeaderDots } from "@/components/header-dots";
 import { ConfirmDialog } from "@/components/print-controls";
+import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>}
-          <span />
+          {api.isMock ? <Badge variant="secondary">Mock data</Badge> : <span />}
         </div>
       </header>
 
